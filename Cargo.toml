@@ -1,0 +1,53 @@
+[package]
+name = "sniperbot"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "A high-performance cryptocurrency sniper bot with MetaMask integration"
+
+[dependencies]
+# Ethereum and Web3 integration
+web3 = "0.19.0"
+ethers = { version = "2.0", features = ["ws", "rustls"] }
+secp256k1 = "0.27.0"
+
+# Async runtime
+tokio = { version = "1.32.0", features = ["full"] }
+
+# Error handling
+anyhow = "1.0.75"
+thiserror = "1.0.48"
+
+# Logging and debugging
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"
+
+# Configuration
+config = "0.13.3"
+dotenv = "0.15.0"
+serde = { version = "1.0.188", features = ["derive"] }
+serde_json = "1.0.107"
+
+# API clients
+reqwest = { version = "0.11.20", features = ["json"] }
+
+# Utilities
+chrono = "0.4.31"
+futures = "0.3.28"
+async-trait = "0.1.73"
+hex = "0.4.3"
+
+# Testing
+mockall = "0.11.4"
+tokio-test = "0.4.3"
+
+[dev-dependencies]
+criterion = "0.5.1"
+test-case = "3.1.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
