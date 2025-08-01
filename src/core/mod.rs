@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 use tracing::{info, warn, error};
 
 mod config;
+mod dex_monitor;
 mod market;
 mod types;
 
@@ -14,6 +15,7 @@ use crate::utils;
 
 // Re-export public types
 pub use config::Config;
+pub use dex_monitor::{DexMonitor, DexMonitorConfig, LiquidityEvent};
 pub use types::*;
 
 pub struct Bot {
@@ -21,6 +23,7 @@ pub struct Bot {
     trading: Arc<RwLock<Trading>>,
     provider: Provider<Http>,
     config: Config,
+    dex_monitor: Arc<RwLock<DexMonitor>>,
 }
 
 impl Bot {
@@ -30,23 +33,52 @@ impl Bot {
         
         let wallet = Arc::new(RwLock::new(Wallet::new(&config).await?));
         let trading = Arc::new(RwLock::new(Trading::new(&config).await?));
+        
+        // Initialize DEX monitor with configuration
+        let dex_config = DexMonitorConfig::default();
+        let dex_monitor = Arc::new(RwLock::new(DexMonitor::new(dex_config)));
 
         Ok(Self {
             wallet,
             trading,
             provider,
             config,
+            dex_monitor,
         })
     }
 
     pub async fn run(&self) -> Result<()> {
         info!("Bot is running...");
         
-        // Initialize market monitoring
+        // Start WebSocket DEX monitoring in a separate task
+        let dex_monitor = Arc::clone(&self.dex_monitor);
+        let monitoring_task = tokio::spawn(async move {
+            let mut monitor = dex_monitor.write().await;
+            if let Err(e) = monitor.start_monitoring().await {
+                error!("DEX monitoring failed: {}", e);
+            }
+        });
+        
+        // Initialize traditional market monitoring as fallback
         let market = market::Market::new(&self.provider, &self.config).await?;
         
+        // Run both monitoring systems concurrently
+        tokio::select! {
+            _ = monitoring_task => {
+                warn!("WebSocket monitoring task completed");
+            }
+            _ = self.run_traditional_monitoring(&market) => {
+                warn!("Traditional monitoring completed");
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Runs traditional polling-based market monitoring as fallback
+    async fn run_traditional_monitoring(&self, market: &market::Market) -> Result<()> {
         loop {
-            if let Err(e) = self.process_market_opportunities(&market).await {
+            if let Err(e) = self.process_market_opportunities(market).await {
                 error!("Error processing market opportunities: {}", e);
             }
             

@@ -3,30 +3,51 @@
 ## Active Tasks
 
 ### Windsurf AI (Senior Developer)
-**Current Task**: Task 1.1 - Set up Rust project structure with proper modules
+**Current Task**: Task 1.4 - WebSocket connection to Uniswap subgraph
+**Status**: Ready to start
+**Priority**: High
+**Estimated Credits**: 2
+
+**Task Details**:
+- Implement stable WebSocket connection to Uniswap subgraph
+- Handle connection drops and implement reconnection logic
+- Parse incoming liquidity events
+- Use tokio-tungstenite for WebSocket implementation
+- Implement exponential backoff for reconnection
+
+**Acceptance Criteria**:
+- [ ] Stable WebSocket connection established
+- [ ] Connection drop handling with reconnection
+- [ ] Liquidity event parsing implemented
+- [ ] Exponential backoff reconnection strategy
+
+### Cursor AI (Junior Developer)
+**Current Task**: Task 1.2 - Configuration management system
 **Status**: Ready to start
 **Priority**: High
 **Estimated Credits**: 1
 
 **Task Details**:
-- Review existing Cargo.toml and src/ structure
-- Implement proper module organization (core, wallet, trading, utils)
-- Set up basic error handling framework
-- Configure necessary dependencies (tokio, serde, etc.)
+- Create Config struct with trading parameters
+- Implement load/save configuration to JSON file
+- Add environment variable support
+- Use serde_json for serialization
+- Include validation for config values
 
 **Acceptance Criteria**:
-- [ ] Cargo.toml configured with necessary dependencies
-- [ ] Module structure for core, wallet, trading, utils
-- [ ] Basic error handling framework
-- [ ] Project compiles without errors
+- [ ] Config struct with trading parameters
+- [ ] Load/save configuration to JSON file
+- [ ] Environment variable support
+- [ ] Configuration validation implemented
 
-### Cursor AI (Junior Developer)
-**Current Task**: Waiting for assignment
-**Status**: Standby
-**Next Task**: Task 1.2 - Configuration management system (after Task 1.1 completion)
+**Next Task**: Task 1.3 - Logging and error handling (after Task 1.2)
 
 ## Completed Tasks
-*None yet*
+- ✅ **Task 1.1** (Windsurf): Set up Rust project structure - COMPLETED
+  - Module structure created (core, wallet, trading, utils, error)
+  - Custom error handling implemented
+  - Cargo.toml updated with dependencies
+  - Architecture documentation added
 
 ## Blocked Tasks
 *None currently*
