@@ -7,7 +7,7 @@
 | 1.1 | Set up Rust project structure | Windsurf | Completed | feature/task-1.1-rust-project-structure | Pending | ✅ Module structure, error handling, utils created |
 | 1.2 | Configuration management system | Cursor | Waiting | - | - | Depends on 1.1 |
 | 1.3 | Logging and error handling | Cursor | Waiting | - | - | Depends on 1.1 |
-| 1.4 | WebSocket connection to Uniswap | Windsurf | Waiting | - | - | Depends on 1.1-1.3 |
+| 1.4 | WebSocket connection to Uniswap | Windsurf | Completed | feature/task-1.4-websocket-uniswap | Pending | ✅ WebSocket connection, reconnection logic, event parsing implemented |
 | 1.5 | Liquidity pair detection logic | Cursor | Waiting | - | - | Depends on 1.4 |
 | 1.6 | Price feed monitoring | Cursor | Waiting | - | - | Depends on 1.4 |
 

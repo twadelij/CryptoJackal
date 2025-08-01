@@ -3,23 +3,23 @@
 ## Active Tasks
 
 ### Windsurf AI (Senior Developer)
-**Current Task**: Task 1.4 - WebSocket connection to Uniswap subgraph
+**Current Task**: Task 2.1 - MetaMask connection interface
 **Status**: Ready to start
 **Priority**: High
 **Estimated Credits**: 2
 
 **Task Details**:
-- Implement stable WebSocket connection to Uniswap subgraph
-- Handle connection drops and implement reconnection logic
-- Parse incoming liquidity events
-- Use tokio-tungstenite for WebSocket implementation
-- Implement exponential backoff for reconnection
+- Implement MetaMask connection interface for secure wallet integration
+- Handle wallet connection/disconnection events
+- Implement account switching and network detection
+- Create secure transaction signing workflow
+- No private key storage - MetaMask handles all signing
 
 **Acceptance Criteria**:
-- [ ] Stable WebSocket connection established
-- [ ] Connection drop handling with reconnection
-- [ ] Liquidity event parsing implemented
-- [ ] Exponential backoff reconnection strategy
+- [ ] MetaMask connection interface implemented
+- [ ] Account and network change handling
+- [ ] Secure transaction preparation
+- [ ] Connection state management
 
 ### Cursor AI (Junior Developer)
 **Current Task**: Task 1.2 - Configuration management system
@@ -48,6 +48,11 @@
   - Custom error handling implemented
   - Cargo.toml updated with dependencies
   - Architecture documentation added
+- ✅ **Task 1.4** (Windsurf): WebSocket connection to Uniswap subgraph - COMPLETED
+  - Stable WebSocket connection with reconnection logic
+  - GraphQL subscription for liquidity events
+  - Exponential backoff strategy implemented
+  - Integrated with Bot's concurrent monitoring system
 
 ## Blocked Tasks
 *None currently*

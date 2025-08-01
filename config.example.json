@@ -1,0 +1,33 @@
+{
+  "node_url": "https://eth-mainnet.alchemyapi.io/v2/your-api-key",
+  "chain_id": 1,
+  "private_key": "your-private-key-here",
+  "wallet_address": "your-wallet-address-here",
+  "scan_interval": 1000,
+  "gas_limit": 300000,
+  "gas_price_gwei": 20,
+  "max_gas_price_gwei": 100,
+  "slippage_tolerance": 2.0,
+  "min_liquidity": 10.0,
+  "max_price_impact": 5.0,
+  "target_tokens": [
+    "0xA0b86a33E6441b8c4C8C1C1B8c4C8C1C1B8c4C8C1",
+    "0x1234567890abcdef1234567890abcdef12345678"
+  ],
+  "max_trade_size_eth": 0.1,
+  "min_profit_threshold": 0.5,
+  "max_daily_trades": 10,
+  "stop_loss_percentage": 10.0,
+  "take_profit_percentage": 20.0,
+  "uniswap_v2_router": "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+  "uniswap_v3_router": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+  "weth_address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+  "enable_telegram_alerts": false,
+  "telegram_bot_token": null,
+  "telegram_chat_id": null,
+  "enable_mev_protection": false,
+  "flashbots_relay_url": null,
+  "max_priority_fee_gwei": 2,
+  "log_level": "info",
+  "log_file_path": null
+} 
