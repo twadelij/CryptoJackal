@@ -1,11 +1,15 @@
-use anyhow::Result;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+// Module declarations
 mod core;
+mod error;
 mod trading;
 mod utils;
 mod wallet;
+
+// Re-export common types
+pub use error::{CryptoJackalError, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {

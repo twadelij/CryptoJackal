@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::Result;
 use ethers::prelude::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -10,17 +10,22 @@ mod types;
 
 use crate::trading::Trading;
 use crate::wallet::Wallet;
+use crate::utils;
+
+// Re-export public types
+pub use config::Config;
+pub use types::*;
 
 pub struct Bot {
     wallet: Arc<RwLock<Wallet>>,
     trading: Arc<RwLock<Trading>>,
     provider: Provider<Http>,
-    config: config::Config,
+    config: Config,
 }
 
 impl Bot {
     pub async fn new() -> Result<Self> {
-        let config = config::Config::load()?;
+        let config = Config::load()?;
         let provider = Provider::<Http>::try_from(&config.node_url)?;
         
         let wallet = Arc::new(RwLock::new(Wallet::new(&config).await?));
@@ -73,4 +78,7 @@ impl Bot {
         // Perform the trade
         trading.execute(opportunity, &wallet).await
     }
-} 
+}
+
+// Re-export the Bot struct and related types for external use
+pub use self::Bot; 
