@@ -6,16 +6,19 @@ use tracing::{info, warn, error};
 
 mod config;
 mod market;
+mod transaction_signing;
 mod types;
 
 use crate::trading::Trading;
 use crate::wallet::Wallet;
+use transaction_signing::{TransactionSigningWorkflow, TransactionSigningConfig, GasStrategy};
 
 pub struct Bot {
     wallet: Arc<RwLock<Wallet>>,
     trading: Arc<RwLock<Trading>>,
     provider: Provider<Http>,
     config: config::Config,
+    transaction_signing: Arc<TransactionSigningWorkflow>,
 }
 
 impl Bot {
@@ -25,12 +28,17 @@ impl Bot {
         
         let wallet = Arc::new(RwLock::new(Wallet::new(&config).await?));
         let trading = Arc::new(RwLock::new(Trading::new(&config).await?));
+        
+        // Initialize transaction signing workflow
+        let transaction_signing_config = TransactionSigningConfig::default();
+        let transaction_signing = Arc::new(TransactionSigningWorkflow::new(transaction_signing_config));
 
         Ok(Self {
             wallet,
             trading,
             provider,
             config,
+            transaction_signing,
         })
     }
 
@@ -70,7 +78,63 @@ impl Bot {
         let wallet = self.wallet.read().await;
         let trading = self.trading.read().await;
         
-        // Perform the trade
-        trading.execute(opportunity, &wallet).await
+        // Prepare trade parameters
+        let trade_params = trading.prepare_trade_params(opportunity)?;
+        
+        // Prepare transaction for signing
+        let transaction_request = self.transaction_signing
+            .prepare_swap_transaction(&trade_params, GasStrategy::Standard, &self.provider)
+            .await?;
+        
+        info!("Prepared transaction for signing: {}", transaction_request.id);
+        
+        // Sign transaction using MetaMask
+        let signed_transaction = self.transaction_signing
+            .sign_transaction(&transaction_request.id, &wallet)
+            .await?;
+        
+        info!("Transaction signed: {}", transaction_request.id);
+        
+        // Submit transaction to network
+        let tx_hash = self.transaction_signing
+            .submit_transaction(&transaction_request.id, &signed_transaction, &self.provider)
+            .await?;
+        
+        info!("Transaction submitted: {} -> {}", transaction_request.id, tx_hash);
+        
+        // Wait for confirmation
+        let confirmed_transaction = self.transaction_signing
+            .wait_for_confirmation(&transaction_request.id, &tx_hash, &self.provider)
+            .await?;
+        
+        match confirmed_transaction.status {
+            transaction_signing::TransactionStatus::Confirmed => {
+                info!("Transaction confirmed: {} -> {}", transaction_request.id, tx_hash);
+                Ok(())
+            }
+            transaction_signing::TransactionStatus::Failed(error_msg) => {
+                error!("Transaction failed: {} -> {}", transaction_request.id, error_msg);
+                Err(anyhow::anyhow!("Transaction failed: {}", error_msg))
+            }
+            _ => {
+                error!("Transaction in unexpected state: {:?}", confirmed_transaction.status);
+                Err(anyhow::anyhow!("Transaction in unexpected state"))
+            }
+        }
+    }
+    
+    /// Gets transaction signing metrics
+    pub async fn get_transaction_metrics(&self) -> transaction_signing::TransactionMetrics {
+        self.transaction_signing.get_metrics().await
+    }
+    
+    /// Gets transaction status
+    pub async fn get_transaction_status(&self, transaction_id: &str) -> Option<transaction_signing::TransactionStatus> {
+        self.transaction_signing.get_transaction_status(transaction_id).await
+    }
+    
+    /// Cancels a pending transaction
+    pub async fn cancel_transaction(&self, transaction_id: &str) -> Result<()> {
+        self.transaction_signing.cancel_transaction(transaction_id).await
     }
 } 
