@@ -32,8 +32,8 @@ src/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/SniperBot.git
-cd SniperBot
+git clone https://github.com/yourusername/CryptoJackal.git
+cd CryptoJackal
 ```
 
 2. Install dependencies:

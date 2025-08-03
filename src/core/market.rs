@@ -25,7 +25,7 @@ impl Market {
     pub async fn new(provider: &Provider<Http>, config: &Config) -> Result<Self> {
         Ok(Self {
             provider: Arc::new(provider.clone()),
-            config: Arc::new(config.clone()),
+            config: Arc::new((*config).clone()),
         })
     }
 

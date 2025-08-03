@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use std::env;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub node_url: String,
     pub private_key: String,

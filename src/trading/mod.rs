@@ -48,7 +48,7 @@ impl Trading {
         }
     }
 
-    fn prepare_trade_params(&self, opportunity: &Opportunity) -> Result<TradeParams> {
+    pub fn prepare_trade_params(&self, opportunity: &Opportunity) -> Result<TradeParams> {
         let deadline = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
             .as_secs()

@@ -3,6 +3,7 @@ use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod core;
+mod demo;
 mod trading;
 mod wallet;
 
@@ -23,7 +24,7 @@ async fn main() -> Result<()> {
         .pretty()
         .init();
 
-    info!("Starting SniperBot...");
+    info!("Starting CryptoJackal...");
 
     // Load environment variables
     dotenv::dotenv().ok();

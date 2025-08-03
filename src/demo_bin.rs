@@ -3,6 +3,7 @@ use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod core;
+mod demo;
 mod trading;
 mod wallet;
 
@@ -25,9 +26,11 @@ async fn main() -> Result<()> {
     // Load environment variables
     dotenv::dotenv().ok();
 
-    // Run the demo (placeholder - demo module needs to be implemented)
-    info!("🚀 CryptoJackal Demo would run here");
-    info!("📊 All systems integrated and ready for testing");
+    // Run the comprehensive demo
+    demo::run_cryptojackal_demo().await?;
+    
+    // Show development metrics
+    demo::show_development_metrics().await?;
 
     info!("🎉 Demo completed successfully!");
     Ok(())
