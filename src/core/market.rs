@@ -13,6 +13,7 @@ pub struct Opportunity {
     pub liquidity: f64,
     pub volatility: f64,
     pub price_impact: f64,
+    pub expected_profit: f64,
 }
 
 pub struct Market {
@@ -46,6 +47,7 @@ impl Market {
                         liquidity,
                         volatility,
                         price_impact,
+                        expected_profit: self.calculate_expected_profit(price, volatility).await?,
                     });
                 }
             }
@@ -55,24 +57,33 @@ impl Market {
     }
 
     async fn get_token_info(&self, address: &str) -> Result<TokenInfo> {
-        // Implementation for fetching token information from the blockchain
-        // This would include symbol, decimals, total supply, etc.
-        todo!("Implement token info fetching")
+        // Mock implementation for testing - in production this would fetch from blockchain
+        TokenInfo::new(
+            address,
+            "MOCK".to_string(),
+            18,
+            1_000_000_000_000_000_000_000_000u128, // 1 billion tokens
+        )
     }
 
-    async fn get_market_data(&self, token: &TokenInfo) -> Result<(f64, f64)> {
-        // Implementation for fetching current price and liquidity
-        todo!("Implement market data fetching")
+    async fn get_market_data(&self, _token: &TokenInfo) -> Result<(f64, f64)> {
+        // Mock implementation for testing - in production this would fetch from DEX
+        Ok((1.0, 1_000_000.0)) // $1 price, $1M liquidity
     }
 
-    async fn calculate_volatility(&self, token: &TokenInfo) -> Result<f64> {
-        // Implementation for calculating token volatility
-        todo!("Implement volatility calculation")
+    async fn calculate_volatility(&self, _token: &TokenInfo) -> Result<f64> {
+        // Mock implementation for testing - in production this would calculate from price history
+        Ok(0.1) // 10% volatility
     }
 
-    async fn estimate_price_impact(&self, token: &TokenInfo, current_price: f64) -> Result<f64> {
-        // Implementation for estimating price impact of potential trade
-        todo!("Implement price impact estimation")
+    async fn estimate_price_impact(&self, _token: &TokenInfo, _current_price: f64) -> Result<f64> {
+        // Mock implementation for testing - in production this would calculate from order book
+        Ok(0.02) // 2% price impact
+    }
+
+    async fn calculate_expected_profit(&self, price: f64, volatility: f64) -> Result<f64> {
+        // Mock implementation for testing - in production this would calculate based on trading strategy
+        Ok(price * volatility * 0.1) // 10% of price * volatility
     }
 
     fn is_valid_opportunity(&self, liquidity: f64, price_impact: f64) -> bool {

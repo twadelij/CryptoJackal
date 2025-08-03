@@ -28,7 +28,7 @@ pub enum TransactionStatus {
 
 /// Transaction signing request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TransactionRequest {
+pub struct SigningTransactionRequest {
     pub id: String,
     pub transaction_type: TransactionType,
     pub params: TransactionParams,
@@ -114,8 +114,8 @@ impl Default for TransactionSigningConfig {
 /// Transaction signing workflow manager
 pub struct TransactionSigningWorkflow {
     config: TransactionSigningConfig,
-    pending_transactions: Arc<RwLock<std::collections::HashMap<String, TransactionRequest>>>,
-    completed_transactions: Arc<RwLock<std::collections::HashMap<String, TransactionRequest>>>,
+    pending_transactions: Arc<RwLock<std::collections::HashMap<String, SigningTransactionRequest>>>,
+    completed_transactions: Arc<RwLock<std::collections::HashMap<String, SigningTransactionRequest>>>,
     metrics: Arc<RwLock<TransactionMetrics>>,
 }
 
@@ -149,7 +149,7 @@ impl TransactionSigningWorkflow {
         trade_params: &TradeParams,
         gas_strategy: GasStrategy,
         provider: &Provider<Http>,
-    ) -> Result<TransactionRequest> {
+    ) -> Result<SigningTransactionRequest> {
         info!("Preparing swap transaction for token: {:?}", trade_params.token_in);
         
         let transaction_id = self.generate_transaction_id();
@@ -166,7 +166,7 @@ impl TransactionSigningWorkflow {
         // Prepare transaction data
         let transaction_data = self.prepare_swap_data(trade_params).await?;
         
-        let transaction_request = TransactionRequest {
+        let transaction_request = SigningTransactionRequest {
             id: transaction_id,
             transaction_type: TransactionType::Swap,
             params: TransactionParams {
@@ -206,7 +206,7 @@ impl TransactionSigningWorkflow {
         amount: U256,
         gas_strategy: GasStrategy,
         provider: &Provider<Http>,
-    ) -> Result<TransactionRequest> {
+    ) -> Result<SigningTransactionRequest> {
         info!("Preparing approval transaction for token: {:?}", token_address);
         
         let transaction_id = self.generate_transaction_id();
@@ -223,7 +223,7 @@ impl TransactionSigningWorkflow {
         // Prepare approval data
         let approval_data = self.prepare_approval_data(spender_address, amount).await?;
         
-        let transaction_request = TransactionRequest {
+        let transaction_request = SigningTransactionRequest {
             id: transaction_id,
             transaction_type: TransactionType::Approve,
             params: TransactionParams {
@@ -331,7 +331,7 @@ impl TransactionSigningWorkflow {
         transaction_id: &str,
         tx_hash: &str,
         provider: &Provider<Http>,
-    ) -> Result<TransactionRequest> {
+    ) -> Result<SigningTransactionRequest> {
         info!("Waiting for confirmation: {} -> {}", transaction_id, tx_hash);
         
         let start_time = SystemTime::now();

@@ -32,9 +32,8 @@ pub struct TradeParams {
 #[derive(Debug)]
 pub struct TradeResult {
     pub success: bool,
-    pub transaction_hash: Option<String>,
+    pub tx_hash: Option<String>,
     pub amount_in: u128,
     pub amount_out: u128,
     pub gas_used: u64,
-    pub effective_price: f64,
 } 

@@ -4,10 +4,10 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn, error};
 
-mod config;
-mod market;
-mod transaction_signing;
-mod types;
+pub mod config;
+pub mod market;
+pub mod transaction_signing;
+pub mod types;
 
 use crate::trading::Trading;
 use crate::wallet::Wallet;

@@ -5,6 +5,10 @@ edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "A high-performance cryptocurrency sniper bot with MetaMask integration"
 
+[[bin]]
+name = "demo"
+path = "src/demo_bin.rs"
+
 [dependencies]
 # Ethereum and Web3 integration
 web3 = "0.19.0"

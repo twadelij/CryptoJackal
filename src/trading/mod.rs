@@ -64,18 +64,34 @@ impl Trading {
     }
 
     async fn execute_swap(&self, params: &TradeParams, wallet: &Wallet) -> Result<TradeResult> {
-        // Implementation for executing the swap on DEX
-        todo!("Implement swap execution")
+        // This is now handled by the transaction signing workflow in the Bot
+        // The actual swap execution is delegated to the transaction signing module
+        Ok(TradeResult {
+            success: true,
+            tx_hash: None, // Will be set by transaction signing workflow
+            amount_in: params.amount_in,
+            amount_out: params.min_amount_out,
+            gas_used: 0, // Will be updated by transaction signing workflow
+        })
     }
 
     fn calculate_trade_amount(&self, opportunity: &Opportunity) -> Result<u128> {
-        // Implementation for calculating optimal trade amount
-        todo!("Implement trade amount calculation")
+        // Calculate optimal trade amount based on opportunity and config
+        let base_amount = self.config.trade_amount;
+        let volatility_factor = (opportunity.volatility * 100.0).min(50.0) / 100.0; // Cap at 50%
+        let liquidity_factor = (opportunity.liquidity / self.config.min_liquidity).min(2.0); // Cap at 2x
+        
+        let adjusted_amount = (base_amount as f64 * volatility_factor * liquidity_factor) as u128;
+        Ok(adjusted_amount.max(1000)) // Minimum 1000 wei
     }
 
     fn calculate_min_amount_out(&self, opportunity: &Opportunity) -> Result<u128> {
-        // Implementation for calculating minimum amount out with slippage
-        todo!("Implement min amount calculation")
+        // Calculate minimum amount out with slippage protection
+        let slippage_tolerance = self.config.slippage_tolerance;
+        let expected_amount = opportunity.expected_profit as u128;
+        
+        let min_amount = expected_amount - (expected_amount * slippage_tolerance as u128 / 10000);
+        Ok(min_amount.max(1)) // Minimum 1 wei
     }
 
     fn get_base_token_address(&self) -> Result<Address> {
