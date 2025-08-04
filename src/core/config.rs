@@ -5,7 +5,6 @@ use std::env;
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub node_url: String,
-    pub private_key: String,
     pub scan_interval: u64,
     pub gas_limit: u64,
     pub slippage_tolerance: f64,
@@ -19,7 +18,6 @@ impl Config {
     pub fn load() -> Result<Self> {
         Ok(Self {
             node_url: get_env_var("NODE_URL")?,
-            private_key: get_env_var("PRIVATE_KEY")?,
             scan_interval: get_env_var("SCAN_INTERVAL")?.parse()?,
             gas_limit: get_env_var("GAS_LIMIT")?.parse()?,
             slippage_tolerance: get_env_var("SLIPPAGE_TOLERANCE")?.parse()?,

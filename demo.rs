@@ -41,13 +41,12 @@ impl CryptoJackalDemo {
         // Create mock configuration
         let config = crate::core::config::Config {
             node_url: "https://mainnet.infura.io/v3/demo".to_string(),
-            private_key: "0x0000000000000000000000000000000000000000000000000000000000000001".to_string(),
             scan_interval: 1000,
             gas_limit: 200000,
-            slippage_tolerance: 500.0,
-            min_liquidity: 1000000.0,
-            max_price_impact: 0.05,
-            trade_amount: 1000000000000000000u128, // 1 ETH
+            slippage_tolerance: 0.005,
+            min_liquidity: 10.0,
+            max_price_impact: 0.02,
+            trade_amount: 100000000000000000u128, // 0.1 ETH
             target_tokens: vec!["0xA0b86a33E6441b8C4C8C8C8C8C8C8C8C8C8C8C8".to_string()],
         };
 

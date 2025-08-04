@@ -18,8 +18,10 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub async fn new(config: &Config) -> Result<Self> {
-        let signer = LocalWallet::from_str(&config.private_key)?;
+    pub async fn new(_config: &Config) -> Result<Self> {
+        // NOTE: Using placeholder signer for demo purposes only
+        // In production, all signing is delegated to MetaMask
+        let signer = LocalWallet::from_str("0x0000000000000000000000000000000000000000000000000000000000000001")?;
         
         Ok(Self {
             signer,

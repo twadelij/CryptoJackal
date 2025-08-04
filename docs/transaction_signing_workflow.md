@@ -388,7 +388,7 @@ pub struct TransactionSigningWorkflow {
 
 // ❌ WRONG - Private key storage (SECURITY VIOLATION)
 pub struct TransactionSigningWorkflow {
-    private_key: String, // SECURITY VIOLATION!
+    // NOTE: No private key storage - MetaMask-only integration
     // ... other fields
 }
 ```
