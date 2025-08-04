@@ -34,6 +34,6 @@ impl Config {
     }
 }
 
-fn get_env_var(key: &str) -> Result<String> {
+pub fn get_env_var(key: &str) -> Result<String> {
     env::var(key).map_err(|_| anyhow::anyhow!("Missing environment variable: {}", key))
 } 

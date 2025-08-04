@@ -22,8 +22,8 @@ pub struct Bot {
 }
 
 impl Bot {
-    pub async fn new() -> Result<Self> {
-        let config = config::Config::load()?;
+    pub async fn new(config: &config::Config) -> Result<Self> {
+        let config = config.clone();
         let provider = Provider::<Http>::try_from(&config.node_url)?;
         
         let wallet = Arc::new(RwLock::new(Wallet::new(&config).await?));
@@ -79,7 +79,8 @@ impl Bot {
         let trading = self.trading.read().await;
         
         // Prepare trade parameters
-        let trade_params = trading.prepare_trade_params(opportunity)?;
+        // Get wallet reference from RwLock
+        let trade_params = trading.prepare_trade_params(opportunity, &wallet)?;
         
         // Prepare transaction for signing
         let transaction_request = self.transaction_signing

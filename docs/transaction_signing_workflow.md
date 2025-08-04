@@ -1,17 +1,17 @@
 # Transaction Signing Workflow
 
-CryptoJackal gebruikt een geavanceerd transaction signing workflow systeem dat MetaMask integratie biedt voor veilige transactie ondertekening zonder private key storage.
+CryptoJackal uses an advanced transaction signing workflow system that provides MetaMask integration for secure transaction signing without private key storage.
 
-## Overzicht
+## Overview
 
-Het transaction signing workflow systeem biedt:
+The transaction signing workflow system provides:
 
-- **MetaMask-Only Integration** - Alle signing gedelegeerd naar MetaMask
-- **Zero Private Key Storage** - Geen private keys in code of configuratie
-- **Gas Optimization** - Intelligente gas prijs strategieën
-- **Transaction Lifecycle Management** - Volledige tracking van transactie status
-- **Error Handling** - Robuuste error handling en recovery
-- **Performance Monitoring** - Uitgebreide metrics en monitoring
+- **MetaMask-Only Integration** - All signing delegated to MetaMask
+- **Zero Private Key Storage** - No private keys in code or configuration
+- **Gas Optimization** - Intelligent gas price strategies
+- **Transaction Lifecycle Management** - Complete tracking of transaction status
+- **Error Handling** - Robust error handling and recovery
+- **Performance Monitoring** - Comprehensive metrics and monitoring
 
 ## Core Components
 

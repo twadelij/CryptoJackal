@@ -27,6 +27,7 @@ pub struct TradeParams {
     pub amount_in: u128,
     pub min_amount_out: u128,
     pub deadline: u64,
+    pub recipient: Address,
 }
 
 #[derive(Debug)]

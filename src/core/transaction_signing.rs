@@ -1,17 +1,34 @@
 use anyhow::Result;
 use ethers::{
-    prelude::*,
-    types::{Address, TransactionRequest, U256, Bytes},
+    contract::abigen,
+    middleware::Middleware,
+    providers::{Http, Provider},
+    types::{Address, TransactionRequest, U256, Bytes, H256, transaction::eip2718::TypedTransaction},
+    utils::rlp::Decodable,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info};
 
-use super::config::Config;
-use super::types::{TradeParams, TradeResult};
+use super::types::TradeParams;
 use crate::wallet::Wallet;
+
+// Transaction signing module for CryptoJackal
+
+// Generate Uniswap V2 Router ABI bindings
+abigen!(
+    UniswapV2Router,
+    r#"[{"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMin","type":"uint256"},{"internalType":"address[]","name":"path","type":"address[]"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"}],"name":"swapExactTokensForTokens","outputs":[{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],"stateMutability":"nonpayable","type":"function"}]"#
+);
+
+// Generate ERC20 ABI bindings
+abigen!(
+    ERC20,
+    r#"[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]"#
+);
 
 /// Transaction signing status
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -167,7 +184,7 @@ impl TransactionSigningWorkflow {
         let transaction_data = self.prepare_swap_data(trade_params).await?;
         
         let transaction_request = SigningTransactionRequest {
-            id: transaction_id,
+            id: transaction_id.clone(),
             transaction_type: TransactionType::Swap,
             params: TransactionParams {
                 to: self.get_uniswap_router_address(),
@@ -224,7 +241,7 @@ impl TransactionSigningWorkflow {
         let approval_data = self.prepare_approval_data(spender_address, amount).await?;
         
         let transaction_request = SigningTransactionRequest {
-            id: transaction_id,
+            id: transaction_id.clone(),
             transaction_type: TransactionType::Approve,
             params: TransactionParams {
                 to: token_address,
@@ -312,10 +329,15 @@ impl TransactionSigningWorkflow {
         
         // Decode signed transaction
         let tx_bytes = hex::decode(signed_transaction.trim_start_matches("0x"))?;
-        let signed_tx = ethers::types::Transaction::from_bytes(&tx_bytes)?;
+        // Convert tx_bytes to Rlp for decoding
+        use ethers::utils::rlp::Rlp;
+        let rlp = Rlp::new(&tx_bytes);
+        let signed_tx = ethers::types::Transaction::decode(&rlp)?;
         
         // Submit to network
-        let pending_tx = provider.send_raw_transaction(signed_tx).await?;
+        // Convert Transaction to Bytes for send_raw_transaction
+        let raw_tx_bytes = Bytes::from(tx_bytes);
+        let pending_tx = provider.send_raw_transaction(raw_tx_bytes).await?;
         let tx_hash = format!("0x{:x}", pending_tx.tx_hash());
         
         // Update transaction with hash
@@ -337,8 +359,9 @@ impl TransactionSigningWorkflow {
         let start_time = SystemTime::now();
         
         // Wait for confirmation
+        let tx_hash_h256 = H256::from_str(tx_hash)?;
         let receipt = provider
-            .get_transaction_receipt(tx_hash.parse()?)
+            .get_transaction_receipt(tx_hash_h256)
             .await?;
         
         if let Some(receipt) = receipt {
@@ -427,7 +450,8 @@ impl TransactionSigningWorkflow {
         tx_request = tx_request.data(swap_data);
         
         // Estimate gas
-        let gas_estimate = provider.estimate_gas(&tx_request, None).await?;
+        let typed_tx = TypedTransaction::Legacy(tx_request.clone());
+        let gas_estimate = provider.estimate_gas(&typed_tx, None).await?;
         
         // Add buffer for safety
         let gas_with_buffer = (gas_estimate.as_u64() as f64 * 1.1) as u64;
@@ -445,7 +469,8 @@ impl TransactionSigningWorkflow {
         tx_request = tx_request.data(approval_data);
         
         // Estimate gas
-        let gas_estimate = provider.estimate_gas(&tx_request, None).await?;
+        let typed_tx = TypedTransaction::Legacy(tx_request.clone());
+        let gas_estimate = provider.estimate_gas(&typed_tx, None).await?;
         
         // Add buffer for safety
         let gas_with_buffer = (gas_estimate.as_u64() as f64 * 1.1) as u64;
@@ -479,20 +504,44 @@ impl TransactionSigningWorkflow {
     }
 
     async fn prepare_swap_data(&self, trade_params: &TradeParams) -> Result<Bytes> {
-        // This would be implemented with actual Uniswap V2 swap function encoding
-        // For now, return placeholder data
-        let swap_function_signature = "swapExactTokensForTokens(uint256,uint256,address[],address,uint256)";
-        let encoded_data = format!("0x{}", hex::encode(swap_function_signature.as_bytes()));
+        // Use the UniswapV2Router generated by the abigen! macro at module scope
+        let router = UniswapV2Router::new(
+            self.get_uniswap_router_address(),
+            // Use the global config node_url from the core module
+            Arc::new(Provider::<Http>::try_from(super::config::get_env_var("NODE_URL").unwrap().as_str())?)
+        );
         
-        Ok(Bytes::from(hex::decode(encoded_data.trim_start_matches("0x"))?))
+        // Create path array [tokenIn, tokenOut]
+        let mut path = Vec::new();
+        path.push(trade_params.token_in);
+        path.push(trade_params.token_out);
+        
+        // Get deadline timestamp (current time + 20 minutes)
+        let deadline = SystemTime::now()
+            .duration_since(UNIX_EPOCH)?
+            .as_secs() + 1200; // 20 minutes
+        
+        // Encode the swap function call
+        let encoded_data = router.swap_exact_tokens_for_tokens(
+            U256::from(trade_params.amount_in),
+            U256::from(trade_params.min_amount_out),
+            path,
+            trade_params.recipient,
+            U256::from(deadline)
+        ).calldata().unwrap();
+        
+        Ok(encoded_data)
     }
 
     async fn prepare_approval_data(&self, spender_address: Address, amount: U256) -> Result<Bytes> {
-        // ERC20 approve function signature
-        let approve_function_signature = "approve(address,uint256)";
-        let encoded_data = format!("0x{}", hex::encode(approve_function_signature.as_bytes()));
+        // Use the ERC20 contract generated by the abigen! macro at module scope
+        // Use the global config node_url from the core module
+        let contract = ERC20::new(Address::zero(), Arc::new(Provider::<Http>::try_from(super::config::get_env_var("NODE_URL").unwrap().as_str())?));
         
-        Ok(Bytes::from(hex::decode(encoded_data.trim_start_matches("0x"))?))
+        // Encode the approve function call
+        let encoded_data = contract.approve(spender_address, amount).calldata().unwrap();
+        
+        Ok(encoded_data)
     }
 
     fn get_uniswap_router_address(&self) -> Address {

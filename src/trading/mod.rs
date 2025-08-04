@@ -33,7 +33,7 @@ impl Trading {
     pub async fn execute(&self, opportunity: &Opportunity, wallet: &Wallet) -> Result<TradeResult> {
         info!("Executing trade for token: {}", opportunity.token.symbol);
 
-        let trade_params = self.prepare_trade_params(opportunity)?;
+        let trade_params = self.prepare_trade_params(opportunity, wallet)?;
         
         // Execute the trade
         match self.execute_swap(&trade_params, wallet).await {
@@ -48,7 +48,7 @@ impl Trading {
         }
     }
 
-    pub fn prepare_trade_params(&self, opportunity: &Opportunity) -> Result<TradeParams> {
+    pub fn prepare_trade_params(&self, opportunity: &Opportunity, wallet: &Wallet) -> Result<TradeParams> {
         let deadline = SystemTime::now()
             .duration_since(UNIX_EPOCH)?
             .as_secs()
@@ -60,6 +60,7 @@ impl Trading {
             amount_in: self.calculate_trade_amount(opportunity)?,
             min_amount_out: self.calculate_min_amount_out(opportunity)?,
             deadline,
+            recipient: wallet.address(),
         })
     }
 

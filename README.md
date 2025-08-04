@@ -1,16 +1,16 @@
-# Cryptocurrency Sniper Bot
+# CryptoJackal
 
-A high-performance cryptocurrency sniper bot built in Rust, designed for rapid trading execution and seamless integration with MetaMask.
+A high-performance cryptocurrency sniper bot built in Rust, designed for rapid trading execution on Uniswap V2/V3 with MetaMask-only integration for maximum security.
 
 ## Features
 
-- High-speed trading execution
-- MetaMask wallet integration
-- Real-time market monitoring
-- Volatility-based cryptocurrency selection
-- Secure key management
-- Comprehensive testing suite
-- Performance monitoring
+- **High-speed trading execution** with optimized gas strategies
+- **Zero private key storage** with MetaMask-only wallet integration
+- **Real-time market monitoring** via Uniswap subgraph WebSocket
+- **MEV protection** against front-running and sandwich attacks
+- **Order execution queue** with prioritization and lifecycle management
+- **Gas price optimization** for cost-effective transactions
+- **Comprehensive testing suite** and performance monitoring
 
 ## Project Structure
 
@@ -32,7 +32,7 @@ src/
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/CryptoJackal.git
+git clone https://github.com/twadelij/CryptoJackal.git
 cd CryptoJackal
 ```
 
@@ -57,10 +57,11 @@ cargo run --release
 
 ## Security Considerations
 
-- Never share your private keys
-- Use environment variables for sensitive data
-- Regularly audit dependencies
-- Test thoroughly on testnet before mainnet deployment
+- **Zero Private Key Storage**: All transaction signing is delegated to MetaMask
+- **No Private Keys in Code or Config**: The system is designed to never require or store private keys
+- **Environment Variables**: Use environment variables for node URLs and other sensitive data
+- **Regular Dependency Audits**: All dependencies are regularly audited for security vulnerabilities
+- **Testnet First**: Always test thoroughly on testnet before mainnet deployment
 
 ## Testing
 

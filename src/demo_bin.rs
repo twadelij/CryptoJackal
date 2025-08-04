@@ -10,7 +10,7 @@ mod wallet;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging with pretty output
-    let subscriber = FmtSubscriber::builder()
+    FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_file(true)
         .with_line_number(true)

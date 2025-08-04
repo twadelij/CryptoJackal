@@ -12,8 +12,8 @@ mod integration_tests;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
-    let subscriber = FmtSubscriber::builder()
+    // Initialize logging with pretty output
+    FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_file(true)
         .with_line_number(true)
@@ -29,8 +29,11 @@ async fn main() -> Result<()> {
     // Load environment variables
     dotenv::dotenv().ok();
 
+    // Load configuration
+    let config = core::config::Config::load()?;
+    
     // Initialize the bot
-    let bot = core::Bot::new().await?;
+    let bot = core::Bot::new(&config).await?;
     
     // Start the bot
     bot.run().await?;
