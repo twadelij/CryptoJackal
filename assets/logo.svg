@@ -33,7 +33,7 @@
   <!-- Center dot -->
   <circle cx="100" cy="100" r="3" fill="#000000"/>
   
-  <!-- Title -->
-  <text x="100" y="185" font-family="Arial, sans-serif" font-size="14" font-weight="bold" 
-        text-anchor="middle" fill="#000000">CRYPTOJACKAL</text>
+  <!-- Title (moved to center, red color, aggressive font) -->
+  <text x="100" y="105" font-family="Impact, 'Arial Black', sans-serif" font-size="16" font-weight="900" 
+        text-anchor="middle" fill="#cc0000" letter-spacing="1px">CRYPTOJACKAL</text>
 </svg>
