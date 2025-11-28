@@ -10,6 +10,7 @@ mod wallet;
 mod api;
 mod discovery;
 mod paper_trading;
+mod testing;
 
 #[cfg(test)]
 mod integration_tests;
