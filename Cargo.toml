@@ -32,19 +32,31 @@ dotenv = "0.15.0"
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
 
+# Web API
+axum = "0.7.2"
+tower = "0.4.13"
+tower-http = { version = "0.5.0", features = ["cors", "trace"] }
+hyper = "1.0.1"
+
 # API clients
 reqwest = { version = "0.11.20", features = ["json"] }
 
 # Utilities
-chrono = "0.4.31"
+chrono = { version = "0.4.31", features = ["serde"] }
 futures = "0.3.28"
 async-trait = "0.1.73"
 hex = "0.4.3"
-uuid = { version = "1.6.1", features = ["v4"] }
+uuid = { version = "1.6.1", features = ["v4", "serde"] }
 
 # Testing
 mockall = "0.11.4"
 tokio-test = "0.4.3"
+
+# Database (for future use)
+sqlx = { version = "0.7.3", features = ["runtime-tokio-rustls", "postgres", "sqlite", "chrono", "uuid"], optional = true }
+
+# Redis (for future use)
+redis = { version = "0.24.0", features = ["tokio-comp"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"

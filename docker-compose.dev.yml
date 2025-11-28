@@ -1,0 +1,57 @@
+# =============================================================================
+# CryptoJackal Development Docker Compose
+# =============================================================================
+# Lightweight development environment without monitoring stack
+
+version: '3.8'
+
+services:
+  # Main CryptoJackal Application (Development Mode)
+  cryptojackal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cryptojackal-dev
+    restart: "no"
+    ports:
+      - "8080:8080"    # API server
+      - "8081:8081"    # Health check
+    environment:
+      - NODE_URL=${NODE_URL:-https://mainnet.infura.io/v3/demo}
+      - ENVIRONMENT=development
+      - LOG_LEVEL=debug
+      - LOG_FORMAT=pretty
+      - DEBUG_MODE=true
+      - HOT_RELOAD=true
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - DATABASE_URL=sqlite:///app/data/cryptojackal_dev.db
+      - REDIS_URL=redis://redis:6379
+      - PAPER_TRADING_MODE=true
+      - PAPER_TRADING_BALANCE=100.0
+      - METRICS_ENABLED=false
+      - HEALTH_CHECK_ENABLED=true
+    volumes:
+      - ./src:/app/src:ro
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    depends_on:
+      - redis
+    networks:
+      - cryptojackal-dev-network
+    command: ["cargo", "run", "--release"]
+
+  # Redis Cache (Development)
+  redis:
+    image: redis:7-alpine
+    container_name: cryptojackal-redis-dev
+    restart: "no"
+    ports:
+      - "6379:6379"
+    networks:
+      - cryptojackal-dev-network
+
+networks:
+  cryptojackal-dev-network:
+    driver: bridge

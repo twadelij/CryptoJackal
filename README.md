@@ -1,5 +1,7 @@
 # CryptoJackal
 
+![CryptoJackal Logo](assets/logo.png)
+
 A high-performance cryptocurrency sniper bot built in Rust, designed for rapid trading execution on Uniswap V2/V3 with MetaMask-only integration for maximum security.
 
 ## Features
