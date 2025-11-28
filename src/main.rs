@@ -8,6 +8,8 @@ mod demo;
 mod trading;
 mod wallet;
 mod api;
+mod discovery;
+mod paper_trading;
 
 #[cfg(test)]
 mod integration_tests;

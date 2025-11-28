@@ -18,6 +18,8 @@ use tower_http::{
 use tracing::{info, error};
 
 use crate::core::{config::Config, Bot};
+use crate::discovery::TokenDiscoveryService;
+use crate::paper_trading::PaperTradingService;
 
 pub mod handlers;
 pub mod middleware;
@@ -31,6 +33,8 @@ use models::*;
 pub struct ApiState {
     pub config: Arc<Config>,
     pub bot: Arc<RwLock<Option<Bot>>>,
+    pub discovery_service: Arc<TokenDiscoveryService>,
+    pub paper_trading_service: Arc<PaperTradingService>,
 }
 
 /// API Server
@@ -41,9 +45,14 @@ pub struct ApiServer {
 
 impl ApiServer {
     pub fn new(config: Arc<Config>) -> Self {
+        let discovery_service = Arc::new(TokenDiscoveryService::new((*config).clone()));
+        let paper_trading_service = Arc::new(PaperTradingService::new((*config).clone()));
+
         let state = ApiState {
             config: config.clone(),
             bot: Arc::new(RwLock::new(None)),
+            discovery_service,
+            paper_trading_service,
         };
 
         let app = Router::new()

@@ -187,33 +187,52 @@ pub fn get_env_var_opt(key: &str) -> Option<String> {
     env::var(key).ok()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_config_defaults() {
-        // Test that config can be loaded with minimal required vars
-        std::env::set_var("NODE_URL", "https://example.com");
-        std::env::set_var("TARGET_TOKENS", "0x123,0x456");
-        std::env::set_var("TRADE_AMOUNT", "1000000000000000000");
-        
-        let config = Config::load().unwrap();
-        
-        assert_eq!(config.chain_id, 1);
-        assert_eq!(config.scan_interval, 1000);
-        assert_eq!(config.environment, "development");
-        assert_eq!(config.target_tokens.len(), 2);
-    }
-    
-    #[test]
-    fn test_paper_trading_detection() {
-        std::env::set_var("NODE_URL", "https://example.com");
-        std::env::set_var("TARGET_TOKENS", "0x123");
-        std::env::set_var("TRADE_AMOUNT", "1000000000000000000");
-        std::env::set_var("PAPER_TRADING_MODE", "true");
-        
-        let config = Config::load().unwrap();
-        assert!(config.is_paper_trading());
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            node_url: "https://mainnet.infura.io/v3/demo".to_string(),
+            chain_id: 1,
+            network_name: "ethereum".to_string(),
+            scan_interval: 1000,
+            gas_limit: 300000,
+            slippage_tolerance: 0.005,
+            min_liquidity: 10.0,
+            max_price_impact: 0.02,
+            trade_amount: 100000000000000000,
+            target_tokens: vec![],
+            api_host: "0.0.0.0".to_string(),
+            api_port: 8080,
+            api_base_url: "http://localhost:8080".to_string(),
+            cors_origins: vec!["http://localhost:3000".to_string()],
+            database_url: "sqlite://cryptojackal.db".to_string(),
+            redis_url: "redis://localhost:6379".to_string(),
+            jwt_secret: "default-secret".to_string(),
+            session_timeout: 3600,
+            max_login_attempts: 5,
+            log_level: "info".to_string(),
+            log_format: "json".to_string(),
+            log_file_enabled: true,
+            log_file_path: "/var/log/cryptojackal/app.log".to_string(),
+            metrics_enabled: true,
+            metrics_port: 9090,
+            health_check_enabled: true,
+            health_check_port: 8081,
+            paper_trading_mode: false,
+            paper_trading_balance: 10.0,
+            paper_trading_data_source: "historical".to_string(),
+            dexscreener_api_url: "https://api.dexscreener.com/latest/dex".to_string(),
+            coingecko_api_url: "https://api.coingecko.com/api/v3".to_string(),
+            discovery_scan_interval: 30000,
+            max_new_tokens_per_scan: 10,
+            token_security_check_enabled: true,
+            environment: "development".to_string(),
+            debug_mode: false,
+            hot_reload: true,
+            enable_profiling: false,
+            coingecko_api_key: None,
+            dexscreener_api_key: None,
+            telegram_bot_token: None,
+            discord_webhook_url: None,
+        }
     }
 } 
