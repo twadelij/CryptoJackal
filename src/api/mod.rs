@@ -22,8 +22,9 @@ use crate::discovery::TokenDiscoveryService;
 use crate::paper_trading::PaperTradingService;
 
 pub mod handlers;
-pub mod middleware;
 pub mod models;
+pub mod setup;
+pub mod middleware;
 
 use handlers::*;
 use models::*;
@@ -57,10 +58,12 @@ impl ApiServer {
 
         let app = Router::new()
             // Health check endpoint
+            .route("/", get(health_check))
             .route("/health", get(health_check))
+            .route("/api/health", get(health_check))
             
             // Bot control endpoints
-            .route("/api/bot/status", get(bot_status))
+            .route("/api/bot/status", get(get_bot_status))
             .route("/api/bot/start", post(start_bot))
             .route("/api/bot/stop", post(stop_bot))
             
@@ -71,18 +74,26 @@ impl ApiServer {
             // Trading endpoints
             .route("/api/trading/opportunities", get(get_opportunities))
             .route("/api/trading/execute", post(execute_trade))
-            .route("/api/trading/history", get(trading_history))
+            .route("/api/trading/history", get(get_trading_history))
             
             // Paper trading endpoints
-            .route("/api/paper-trading/balance", get(paper_balance))
-            .route("/api/paper-trading/reset", post(reset_paper_balance))
+            .route("/api/paper-trading/balance", get(get_paper_balance))
+            .route("/api/paper-trading/execute", post(execute_paper_trade))
+            .route("/api/paper-trading/reset", post(reset_paper_portfolio))
+            .route("/api/paper-trading/history", get(get_paper_history))
+            .route("/api/paper-trading/performance", get(get_paper_performance))
             
             // Token discovery endpoints
-            .route("/api/discovery/tokens", get(discover_tokens))
-            .route("/api/discovery/trending", get(trending_tokens))
+            .route("/api/discovery/trending", get(get_trending_tokens))
+            .route("/api/discovery/new", get(get_new_tokens))
+            .route("/api/discovery/analyze/:address", get(analyze_token))
             
-            // Metrics endpoints
+            // Metrics and monitoring endpoints
             .route("/api/metrics", get(get_metrics))
+            .route("/api/metrics/performance", get(get_performance_metrics))
+            
+            // Setup wizard endpoints
+            .nest_service("/api/setup", setup::create_setup_routes())
             
             // Apply middleware
             .layer(

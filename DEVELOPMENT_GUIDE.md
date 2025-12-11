@@ -29,6 +29,7 @@ CryptoJackal is a high-performance cryptocurrency trading bot built in Rust with
 ### Local Development
 
 1. **Clone and setup**:
+
 ```bash
 git clone https://github.com/twadelij/CryptoJackal.git
 cd CryptoJackal
@@ -36,11 +37,13 @@ cp .env.example .env
 ```
 
 2. **Start backend**:
+
 ```bash
 cargo run
 ```
 
 3. **Start frontend**:
+
 ```bash
 cd web
 npm install
@@ -48,6 +51,7 @@ npm run dev
 ```
 
 4. **Access the application**:
+
 - Frontend: http://localhost:3000
 - API: http://localhost:8080
 - Health Check: http://localhost:8081/health
@@ -95,17 +99,20 @@ src/
 ### Backend Development
 
 1. **Install dependencies**:
+
 ```bash
 cargo build
 ```
 
 2. **Run tests**:
+
 ```bash
 cargo test
 cargo test --features integration-tests
 ```
 
 3. **Run with logging**:
+
 ```bash
 RUST_LOG=debug cargo run
 ```
@@ -113,17 +120,20 @@ RUST_LOG=debug cargo run
 ### Frontend Development
 
 1. **Install dependencies**:
+
 ```bash
 cd web
 npm install
 ```
 
 2. **Development server**:
+
 ```bash
 npm run dev
 ```
 
 3. **Build for production**:
+
 ```bash
 npm run build
 ```
@@ -175,11 +185,13 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 ### Core Endpoints
 
 #### Health Check
+
 ```bash
 GET /health
 ```
 
 #### Bot Control
+
 ```bash
 GET  /api/bot/status
 POST /api/bot/start
@@ -187,6 +199,7 @@ POST /api/bot/stop
 ```
 
 #### Trading
+
 ```bash
 GET  /api/trading/opportunities
 POST /api/trading/execute
@@ -194,6 +207,7 @@ GET  /api/trading/history
 ```
 
 #### Paper Trading
+
 ```bash
 GET  /api/paper-trading/balance
 POST /api/paper-trading/execute
@@ -201,6 +215,7 @@ POST /api/paper-trading/reset
 ```
 
 #### Token Discovery
+
 ```bash
 GET  /api/discovery/trending?time_window=24h
 GET  /api/discovery/new?limit=10
