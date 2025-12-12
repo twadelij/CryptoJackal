@@ -61,11 +61,11 @@ pub struct ServiceStatus {
 /// Create setup routes
 pub fn create_setup_routes() -> Router<ApiState> {
     Router::new()
-        .route("/api/setup/validate", post(validate_config))
-        .route("/api/setup/save-config", post(save_config))
-        .route("/api/setup/deploy", post(deploy_setup))
-        .route("/api/setup/status", get(deployment_status))
-        .route("/api/setup/health", get(setup_health))
+        .route("/validate", post(validate_config))
+        .route("/save-config", post(save_config))
+        .route("/deploy", post(deploy_setup))
+        .route("/status", get(deployment_status))
+        .route("/health", get(setup_health))
 }
 
 /// Validate configuration

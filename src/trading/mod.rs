@@ -1,5 +1,7 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use ethers::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 
@@ -9,6 +11,23 @@ use crate::core::{
     types::{TradeParams, TradeResult},
 };
 use crate::wallet::Wallet;
+
+/// Trading opportunity for paper trading and backtesting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TradingOpportunity {
+    pub id: String,
+    pub token_address: String,
+    pub token_symbol: String,
+    pub token_name: String,
+    pub current_price: f64,
+    pub expected_profit: f64,
+    pub liquidity: f64,
+    pub volume_24h: f64,
+    pub price_impact: f64,
+    pub confidence_score: f64,
+    pub discovered_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
 
 pub struct Trading {
     config: Config,

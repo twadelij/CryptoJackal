@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
     info!("🚀 Starting CryptoJackal...");
 
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Load configuration
     let config = Arc::new(core::config::Config::load()?);

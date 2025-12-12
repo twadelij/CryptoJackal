@@ -1,6 +1,7 @@
 use anyhow::Result;
 use std::time::{SystemTime, Duration};
 use tracing::{info, warn};
+use rand::Rng;
 
 use crate::core::config::Config;
 use crate::paper_trading::PaperTradingService;
@@ -95,7 +96,7 @@ impl BacktestingEngine {
                     
                     // Calculate P&L for this trade (simplified)
                     let expected_return = opportunity.expected_profit;
-                    let actual_return = expected_return * (0.8 + (rand::random::<f64>() * 0.4)); // Add some randomness
+                    let actual_return = expected_return * (0.8 + (rand::thread_rng().gen::<f64>() * 0.4)); // Add some randomness
                     
                     if actual_return > 0.0 {
                         profitable_trades += 1;
@@ -169,21 +170,21 @@ impl BacktestingEngine {
             // Base price with trend and volatility
             let base_price = 0.001;
             let trend_component = price_trend * 0.001 * (i as f64 / 24.0); // Daily trend
-            let volatility_component = (rand::random::<f64>() - 0.5) * 0.0005 * volatility_multiplier;
+            let volatility_component = (rand::thread_rng().gen::<f64>() - 0.5) * 0.0005 * volatility_multiplier;
             let price = base_price + trend_component + volatility_component;
             
             // Generate opportunity with random characteristics
             let opportunity = crate::trading::TradingOpportunity {
                 id: format!("backtest-{}", i),
-                token_address: format!("0x{:040x}", rand::random::<u64>()),
+                token_address: format!("0x{:040x}", rand::thread_rng().gen::<u64>()),
                 token_symbol: format!("TOKEN{}", i),
                 token_name: format!("Backtest Token {}", i),
                 current_price: price,
-                expected_profit: (rand::random::<f64>() - 0.3) * 0.05, // -15% to +20%
-                liquidity: 10000.0 + rand::random::<f64>() * 90000.0,
-                volume_24h: 50000.0 + rand::random::<f64>() * 450000.0,
-                price_impact: 0.005 + rand::random::<f64>() * 0.025,
-                confidence_score: 0.6 + rand::random::<f64>() * 0.35,
+                expected_profit: (rand::thread_rng().gen::<f64>() - 0.3) * 0.05, // -15% to +20%
+                liquidity: 10000.0 + rand::thread_rng().gen::<f64>() * 90000.0,
+                volume_24h: 50000.0 + rand::thread_rng().gen::<f64>() * 450000.0,
+                price_impact: 0.005 + rand::thread_rng().gen::<f64>() * 0.025,
+                confidence_score: 0.6 + rand::thread_rng().gen::<f64>() * 0.35,
                 discovered_at: timestamp,
                 expires_at: timestamp + Duration::from_secs(300),
             };

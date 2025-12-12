@@ -220,7 +220,7 @@ impl TokenDiscovery for TokenDiscoveryService {
         self.get_trending_tokens(time_window).await
     }
 
-    async fn analyze_token(&self, address: &str) -> Result<DiscoveredToken>> {
+    async fn analyze_token(&self, address: &str) -> Result<DiscoveredToken> {
         self.analyze_token(address).await
     }
 }

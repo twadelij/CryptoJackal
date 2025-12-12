@@ -95,7 +95,7 @@ struct CoinGeckoContractResponse {
     asset_platform_id: Option<String>,
     platforms: Option<HashMap<String, String>>,
     detail_platforms: Option<HashMap<String, CoinGeckoPlatformDetail>>,
-    market_data: Option<CoinGeckoMarketData>,
+    market_data: Option<CoinGeckoTokenMarketData>,
     categories: Option<Vec<String>>,
 }
 
@@ -133,9 +133,9 @@ impl From<CoinGeckoContractResponse> for CoinGeckoTokenInfo {
     }
 }
 
-/// CoinGecko market data
+/// CoinGecko market data (internal for token info response)
 #[derive(Debug, Deserialize)]
-struct CoinGeckoMarketData {
+struct CoinGeckoTokenMarketData {
     current_price: Option<HashMap<String, f64>>,
     market_cap: Option<f64>,
     total_volume: TotalVolume,

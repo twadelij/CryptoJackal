@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     info!("==================================================");
 
     // Load environment variables
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     // Run the comprehensive demo
     demo::run_cryptojackal_demo().await?;

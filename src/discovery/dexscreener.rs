@@ -129,8 +129,8 @@ impl DexScreenerClient {
             price: pair.price_usd.unwrap_or(0.0),
             market_cap: None, // Will be filled by CoinGecko
             liquidity,
-            volume_24h: pair.volume?.h24?.map(|v| v as f64),
-            price_change_24h: pair.price_change?.h24?.map(|v| v as f64),
+            volume_24h: pair.volume.as_ref().and_then(|v| v.h24),
+            price_change_24h: pair.price_change.as_ref().and_then(|v| v.h24),
             security_score: 0.5, // Will be calculated by security analyzer
             discovered_at: SystemTime::now(),
             tags: vec![],
