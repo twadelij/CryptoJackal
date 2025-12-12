@@ -13,6 +13,10 @@ path = "src/demo_bin.rs"
 # Ethereum and Web3 integration
 web3 = "0.19.0"
 ethers = { version = "2.0", features = ["ws", "rustls"] }
+ethers-core = "2.0"
+ethers-providers = "2.0"
+ethers-signers = "2.0"
+ethers-middleware = "2.0"
 secp256k1 = "0.27.0"
 
 # Async runtime
@@ -28,14 +32,6 @@ hyper = { version = "1.0", features = ["full"] }
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Ethereum/Blockchain
-ethers = "2.0"
-ethers-core = "2.0"
-ethers-providers = "2.0"
-ethers-signers = "2.0"
-ethers-middleware = "2.0"
-web3 = "0.19"
 
 # Configuration
 config = "0.14"
