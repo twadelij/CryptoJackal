@@ -18,9 +18,10 @@ WORKDIR /app
 # Copy Cargo files
 COPY Cargo.toml Cargo.lock ./
 
-# Create dummy main.rs to cache dependencies
+# Create dummy source files to cache dependencies
 RUN mkdir src && \
     echo "fn main() {}" > src/main.rs && \
+    echo "fn main() {}" > src/demo_bin.rs && \
     cargo build --release && \
     rm -rf src
 
