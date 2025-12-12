@@ -2,26 +2,56 @@
 
 ![CryptoJackal Logo](assets/logo.png)
 
-A high-performance cryptocurrency sniper bot built in Rust, designed for rapid trading execution on Uniswap V2/V3 with MetaMask-only integration for maximum security.
+A high-performance cryptocurrency trading platform built in Rust with a modern React web interface. Features automated token discovery, paper trading simulation, and enterprise-grade security.
 
-## Features
+## 🚀 Quick Start
 
-- **High-speed trading execution** with optimized gas strategies
-- **Zero private key storage** with MetaMask-only wallet integration
-- **Real-time market monitoring** via Uniswap subgraph WebSocket
-- **MEV protection** against front-running and sandwich attacks
-- **Order execution queue** with prioritization and lifecycle management
-- **Gas price optimization** for cost-effective transactions
-- **Comprehensive testing suite** and performance monitoring
+### Option 1: Guided Setup (Recommended)
 
-## Project Structure
+```bash
+git clone https://github.com/twadelij/CryptoJackal.git
+cd CryptoJackal
+./setup.sh
+```
+
+### Option 2: GUI Setup Wizard
+
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+# Open http://localhost:3000/setup
+```
+
+### Option 3: Proxmox Test VM
+
+```bash
+./proxmox-setup.sh  # Creates dedicated test container
+```
+
+## ✨ Features
+
+- **🌐 Modern Web Interface** - React/TypeScript dashboard with real-time updates
+- **🔍 Automated Token Discovery** - Real-time detection via DexScreener & CoinGecko
+- **📊 Paper Trading** - Risk-free simulation with historical backtesting
+- **🔒 Enterprise Security** - JWT auth, input validation, audit logging
+- **📈 Advanced Monitoring** - Metrics, health checks, and alerting
+- **🧪 Comprehensive Testing** - Integration, performance, and security tests
+- **🐳 Docker Ready** - One-command deployment with Docker Compose
+
+## 📁 Project Structure
 
 ```
-src/
-├── core/           # Core bot functionality
-├── wallet/         # Wallet integration and management
-├── trading/        # Trading logic and execution
-└── utils/          # Utility functions and helpers
+├── src/
+│   ├── api/            # REST API endpoints
+│   ├── core/           # Core trading engine
+│   ├── discovery/      # Token discovery service
+│   ├── paper_trading/  # Simulation engine
+│   ├── security/       # Security framework
+│   ├── monitoring/     # Metrics & health checks
+│   └── testing/        # Test suites
+├── web/                # React frontend
+├── setup.sh            # CLI setup wizard
+├── proxmox-setup.sh    # Proxmox VM setup
+└── docker-compose.yml  # Production deployment
 ```
 
 ## Prerequisites
