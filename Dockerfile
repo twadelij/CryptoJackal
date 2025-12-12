@@ -4,7 +4,7 @@
 # Optimized for development, testing, and production deployments
 
 # Build Stage
-FROM rust:1.83-slim AS builder
+FROM rust:latest AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
