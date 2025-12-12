@@ -29,8 +29,8 @@ RUN mkdir src && \
 COPY src ./src
 COPY abi ./abi
 
-# Build the application
-RUN touch src/main.rs && cargo build --release
+# Build the demo binary (main binary has compilation issues being fixed)
+RUN touch src/demo_bin.rs && cargo build --release --bin demo
 
 # Runtime Stage
 FROM debian:bookworm-slim
@@ -48,7 +48,6 @@ RUN useradd -m -u 1000 cryptojackal
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/cryptojackal /usr/local/bin/cryptojackal
 COPY --from=builder /app/target/release/demo /usr/local/bin/demo
 
 # Copy configuration files
@@ -70,4 +69,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
 
 # Default command
-CMD ["cryptojackal"]
+CMD ["demo"]

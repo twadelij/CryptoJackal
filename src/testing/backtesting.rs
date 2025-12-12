@@ -222,7 +222,3 @@ impl BacktestingEngine {
     }
 }
 
-// Add rand dependency for backtesting randomness
-fn rand() -> rand::Rng {
-    rand::thread_rng()
-}
