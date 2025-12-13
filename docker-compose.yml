@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  cryptojackal:
+    build: .
+    container_name: cryptojackal
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - PAPER_TRADING_MODE=true
+      - INITIAL_BALANCE=10.0
+      - ENVIRONMENT=production
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: cryptojackal-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  redis_data:
