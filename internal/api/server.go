@@ -77,6 +77,8 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 		// Paper trading
 		api.GET("/paper/balance", handler.GetPaperBalance)
 		api.POST("/paper/reset", handler.ResetPaperBalance)
+		api.POST("/paper/trade", handler.ExecutePaperTrade)
+		api.GET("/paper/history", handler.GetTradingHistory)
 
 		// Metrics
 		api.GET("/metrics", handler.GetMetrics)

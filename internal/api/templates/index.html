@@ -97,12 +97,12 @@
                     <h3 class="text-lg font-semibold mb-4">Trading Settings</h3>
                     <div class="space-y-4 mb-6">
                         <div>
-                            <label class="block text-sm text-gray-400 mb-1">Initial Balance (Paper Mode)</label>
+                            <label class="block text-sm text-gray-400 mb-1">Initial Balance (EUR)</label>
                             <input type="number" id="initial-balance" value="10000" 
                                 class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
                         </div>
                         <div>
-                            <label class="block text-sm text-gray-400 mb-1">Max Trade Size (USD)</label>
+                            <label class="block text-sm text-gray-400 mb-1">Max Trade Size (EUR)</label>
                             <input type="number" id="max-trade" value="100" 
                                 class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
                         </div>
@@ -126,11 +126,11 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <div class="card rounded-xl p-4">
                     <div class="text-gray-400 text-sm mb-1">Balance</div>
-                    <div id="balance" class="text-2xl font-bold">$0.00</div>
+                    <div id="balance" class="text-2xl font-bold">€0.00</div>
                 </div>
                 <div class="card rounded-xl p-4">
                     <div class="text-gray-400 text-sm mb-1">P&L</div>
-                    <div id="pnl" class="text-2xl font-bold text-green-400">+$0.00</div>
+                    <div id="pnl" class="text-2xl font-bold text-green-400">+€0.00</div>
                 </div>
                 <div class="card rounded-xl p-4">
                     <div class="text-gray-400 text-sm mb-1">Total Trades</div>
@@ -176,10 +176,34 @@
                                 <th class="text-right p-4 text-gray-400 font-medium">Price</th>
                                 <th class="text-right p-4 text-gray-400 font-medium">24h Change</th>
                                 <th class="text-right p-4 text-gray-400 font-medium">Volume</th>
+                                <th class="text-right p-4 text-gray-400 font-medium">Action</th>
                             </tr>
                         </thead>
                         <tbody id="tokens-list"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Trade Modal -->
+            <div id="trade-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+                <div class="card rounded-2xl p-6 w-full max-w-md mx-4">
+                    <h3 class="text-xl font-bold mb-4">Paper Trade</h3>
+                    <div id="trade-token-info" class="mb-4 p-3 bg-white/5 rounded-lg"></div>
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Amount (tokens)</label>
+                            <input type="number" id="trade-amount" value="1000" step="100"
+                                class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div class="text-sm text-gray-400">
+                            Cost: <span id="trade-cost" class="text-white font-semibold">€0.00</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="closeTradeModal()" class="flex-1 py-3 rounded-lg font-semibold border border-white/20 hover:bg-white/5">Cancel</button>
+                        <button onclick="executeTrade('buy')" class="flex-1 btn-primary py-3 rounded-lg font-semibold">Buy</button>
+                        <button onclick="executeTrade('sell')" id="sell-btn" class="flex-1 py-3 rounded-lg font-semibold bg-red-500 hover:bg-red-600 hidden">Sell</button>
+                    </div>
                 </div>
             </div>
 
@@ -201,6 +225,8 @@
             lucide.createIcons();
             await checkHealth();
             await loadPaperBalance();
+            await loadMetrics();
+            await loadHistory();
             showDashboard();
             loadTokens();
         });
@@ -219,37 +245,163 @@
             }
         }
 
+        let portfolio = null;
+        
         async function loadPaperBalance() {
             try {
                 const res = await fetch('/api/paper/balance');
                 const data = await res.json();
                 if (data.success) {
-                    document.getElementById('balance').textContent = '$' + data.data.balance.toFixed(2);
-                    const pnl = data.data.balance - 10000;
-                    document.getElementById('pnl').textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
+                    portfolio = data.data;
+                    document.getElementById('balance').textContent = '€' + portfolio.total_value.toFixed(2);
+                    const pnl = portfolio.profit_loss || 0;
+                    document.getElementById('pnl').textContent = (pnl >= 0 ? '+€' : '-€') + Math.abs(pnl).toFixed(2);
                     document.getElementById('pnl').className = 'text-2xl font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
                 }
             } catch (e) { console.error(e); }
         }
+        
+        async function loadMetrics() {
+            try {
+                const res = await fetch('/api/metrics');
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('trades').textContent = data.data.total_trades || 0;
+                    document.getElementById('winrate').textContent = ((data.data.win_rate || 0) * 100).toFixed(0) + '%';
+                }
+            } catch (e) { console.error(e); }
+        }
 
+        let tokens = [];
+        
         async function loadTokens() {
             try {
                 const res = await fetch('/api/discovery/new');
                 const data = await res.json();
                 if (data.success && data.data) {
+                    tokens = data.data;
                     const tbody = document.getElementById('tokens-list');
-                    tbody.innerHTML = data.data.slice(0, 10).map(t => `
-                        <tr class="border-t border-white/5 hover:bg-white/5">
+                    tbody.innerHTML = tokens.slice(0, 15).map((t, i) => `
+                        <tr class="border-t border-white/5 hover:bg-white/5 cursor-pointer" onclick="openTradeModal(${i})">
                             <td class="p-4">
                                 <div class="font-semibold">${t.symbol}</div>
-                                <div class="text-sm text-gray-400">${t.name}</div>
+                                <div class="text-sm text-gray-400 truncate max-w-[150px]">${t.name}</div>
                             </td>
-                            <td class="p-4 text-right">$${t.price < 0.01 ? t.price.toExponential(2) : t.price.toFixed(4)}</td>
+                            <td class="p-4 text-right">€${t.price < 0.01 ? t.price.toExponential(2) : t.price.toFixed(6)}</td>
                             <td class="p-4 text-right ${t.price_change_24h >= 0 ? 'text-green-400' : 'text-red-400'}">
                                 ${t.price_change_24h >= 0 ? '+' : ''}${t.price_change_24h.toFixed(2)}%
                             </td>
-                            <td class="p-4 text-right">$${(t.volume_24h/1000).toFixed(1)}K</td>
+                            <td class="p-4 text-right">€${(t.volume_24h/1000).toFixed(1)}K</td>
+                            <td class="p-4 text-right">
+                                <button class="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30">Trade</button>
+                            </td>
                         </tr>
+                    `).join('');
+                }
+            } catch (e) { console.error(e); }
+        }
+        
+        let selectedToken = null;
+        
+        function openTradeModal(index) {
+            selectedToken = tokens[index];
+            document.getElementById('trade-token-info').innerHTML = `
+                <div class="font-bold text-lg">${selectedToken.symbol}</div>
+                <div class="text-sm text-gray-400">${selectedToken.name}</div>
+                <div class="text-sm mt-2">Price: <span class="text-white">€${selectedToken.price < 0.01 ? selectedToken.price.toExponential(2) : selectedToken.price.toFixed(6)}</span></div>
+            `;
+            updateTradeCost();
+            
+            // Check if we own this token
+            const owned = portfolio?.token_balances?.[selectedToken.address];
+            document.getElementById('sell-btn').classList.toggle('hidden', !owned);
+            
+            document.getElementById('trade-modal').classList.remove('hidden');
+        }
+        
+        function closeTradeModal() {
+            document.getElementById('trade-modal').classList.add('hidden');
+            selectedToken = null;
+        }
+        
+        function updateTradeCost() {
+            const amount = parseFloat(document.getElementById('trade-amount').value) || 0;
+            const cost = amount * (selectedToken?.price || 0);
+            document.getElementById('trade-cost').textContent = '€' + cost.toFixed(2);
+        }
+        
+        document.getElementById('trade-amount')?.addEventListener('input', updateTradeCost);
+        
+        async function executeTrade(type) {
+            if (!selectedToken) return;
+            const amount = parseFloat(document.getElementById('trade-amount').value) || 0;
+            if (amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/paper/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token_address: selectedToken.address,
+                        token_symbol: selectedToken.symbol,
+                        token_name: selectedToken.name,
+                        price: selectedToken.price,
+                        amount: amount,
+                        type: type
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeTradeModal();
+                    await loadPaperBalance();
+                    await loadMetrics();
+                    await loadHistory();
+                    showNotification(`${type.toUpperCase()} order executed: ${amount} ${selectedToken.symbol}`, 'success');
+                } else {
+                    showNotification(data.error || 'Trade failed', 'error');
+                }
+            } catch (e) {
+                showNotification('Trade failed: ' + e.message, 'error');
+            }
+        }
+        
+        function showNotification(message, type) {
+            const div = document.createElement('div');
+            div.className = `fixed top-4 right-4 px-4 py-3 rounded-lg text-white z-50 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+            div.textContent = message;
+            document.body.appendChild(div);
+            setTimeout(() => div.remove(), 3000);
+        }
+        
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/paper/history');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const list = document.getElementById('history-list');
+                    if (data.data.length === 0) {
+                        list.innerHTML = '<div class="card rounded-xl p-6 text-center text-gray-400">No trades yet. Click on a token to start trading!</div>';
+                        return;
+                    }
+                    list.innerHTML = data.data.map(t => `
+                        <div class="card rounded-xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full ${t.type === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'} flex items-center justify-center font-bold">
+                                    ${t.type === 'buy' ? '↓' : '↑'}
+                                </div>
+                                <div>
+                                    <div class="font-semibold">${t.type.toUpperCase()} ${t.token_symbol}</div>
+                                    <div class="text-sm text-gray-400">${new Date(t.executed_at).toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold">€${(t.amount_in * t.price).toFixed(2)}</div>
+                                <div class="text-sm text-gray-400">${t.amount_in.toFixed(2)} tokens @ €${t.price.toFixed(6)}</div>
+                            </div>
+                        </div>
                     `).join('');
                 }
             } catch (e) { console.error(e); }
@@ -323,7 +475,7 @@
         }
 
         // Auto-refresh
-        setInterval(() => { checkHealth(); loadPaperBalance(); }, 30000);
+        setInterval(() => { checkHealth(); loadPaperBalance(); loadMetrics(); loadTokens(); }, 30000);
     </script>
 </body>
 </html>

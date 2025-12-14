@@ -41,7 +41,7 @@ func (h *Handler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{
 		Success: true,
 		Data: gin.H{
-			"status": "healthy",
+			"status":  "healthy",
 			"version": "1.0.0",
 		},
 	})
@@ -170,6 +170,47 @@ func (h *Handler) GetPaperBalance(c *gin.Context) {
 func (h *Handler) ResetPaperBalance(c *gin.Context) {
 	h.paper.Reset()
 	c.JSON(http.StatusOK, Response{Success: true, Data: "Portfolio reset"})
+}
+
+// PaperTradeRequest is the request body for paper trading
+type PaperTradeRequest struct {
+	TokenAddress string  `json:"token_address" binding:"required"`
+	TokenSymbol  string  `json:"token_symbol" binding:"required"`
+	TokenName    string  `json:"token_name"`
+	Price        float64 `json:"price" binding:"required"`
+	Amount       float64 `json:"amount" binding:"required"`
+	Type         string  `json:"type" binding:"required"` // "buy" or "sell"
+}
+
+// ExecutePaperTrade executes a paper trade
+func (h *Handler) ExecutePaperTrade(c *gin.Context) {
+	var req PaperTradeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	token := models.Token{
+		Address: req.TokenAddress,
+		Symbol:  req.TokenSymbol,
+		Name:    req.TokenName,
+		Price:   req.Price,
+	}
+
+	var tradeType models.TradeType
+	if req.Type == "buy" {
+		tradeType = models.TradeTypeBuy
+	} else {
+		tradeType = models.TradeTypeSell
+	}
+
+	trade, err := h.paper.ExecuteTrade(c.Request.Context(), token, tradeType, req.Amount)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{Success: true, Data: trade})
 }
 
 // GetMetrics returns trading metrics

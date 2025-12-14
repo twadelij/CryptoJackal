@@ -13,11 +13,11 @@ import (
 
 // Service manages paper trading simulation
 type Service struct {
-	mu            sync.RWMutex
-	portfolio     *models.Portfolio
-	trades        []models.Trade
+	mu             sync.RWMutex
+	portfolio      *models.Portfolio
+	trades         []models.Trade
 	initialBalance float64
-	logger        *zap.Logger
+	logger         *zap.Logger
 }
 
 // NewService creates a new paper trading service
@@ -25,7 +25,9 @@ func NewService(initialBalance float64, logger *zap.Logger) *Service {
 	return &Service{
 		portfolio: &models.Portfolio{
 			ID:            uuid.New().String(),
-			ETHBalance:    initialBalance,
+			Balance:       initialBalance,
+			Currency:      "EUR",
+			ETHBalance:    initialBalance, // Keep for backward compat
 			TokenBalances: make(map[string]models.TokenBalance),
 			TotalValue:    initialBalance,
 			UpdatedAt:     time.Now(),
@@ -40,15 +42,19 @@ func NewService(initialBalance float64, logger *zap.Logger) *Service {
 func (s *Service) GetPortfolio() *models.Portfolio {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	// Calculate total value
-	total := s.portfolio.ETHBalance
+	total := s.portfolio.Balance
 	for _, balance := range s.portfolio.TokenBalances {
 		total += balance.Value
 	}
 	s.portfolio.TotalValue = total
+	s.portfolio.ETHBalance = s.portfolio.Balance // Keep in sync
 	s.portfolio.ProfitLoss = total - s.initialBalance
-	
+	if s.initialBalance > 0 {
+		s.portfolio.ProfitLossPct = (s.portfolio.ProfitLoss / s.initialBalance) * 100
+	}
+
 	return s.portfolio
 }
 
@@ -62,13 +68,13 @@ func (s *Service) ExecuteTrade(ctx context.Context, token models.Token, tradeTyp
 	switch tradeType {
 	case models.TradeTypeBuy:
 		cost := amount * token.Price
-		if cost > s.portfolio.ETHBalance {
+		if cost > s.portfolio.Balance {
 			trade.Status = models.TradeStatusFailed
-			return trade, fmt.Errorf("insufficient balance: need %.4f ETH, have %.4f", cost, s.portfolio.ETHBalance)
+			return trade, fmt.Errorf("insufficient balance: need %.2f EUR, have %.2f", cost, s.portfolio.Balance)
 		}
-		
-		s.portfolio.ETHBalance -= cost
-		
+
+		s.portfolio.Balance -= cost
+
 		// Update token balance
 		existing, ok := s.portfolio.TokenBalances[token.Address]
 		if ok {
@@ -88,7 +94,7 @@ func (s *Service) ExecuteTrade(ctx context.Context, token models.Token, tradeTyp
 				AvgPrice: token.Price,
 			}
 		}
-		
+
 		trade.AmountOut = amount
 		trade.Status = models.TradeStatusExecuted
 
@@ -98,10 +104,10 @@ func (s *Service) ExecuteTrade(ctx context.Context, token models.Token, tradeTyp
 			trade.Status = models.TradeStatusFailed
 			return trade, fmt.Errorf("insufficient token balance")
 		}
-		
+
 		proceeds := amount * token.Price
-		s.portfolio.ETHBalance += proceeds
-		
+		s.portfolio.Balance += proceeds
+
 		newBalance := existing.Balance - amount
 		if newBalance < 0.0001 {
 			delete(s.portfolio.TokenBalances, token.Address)
@@ -113,7 +119,7 @@ func (s *Service) ExecuteTrade(ctx context.Context, token models.Token, tradeTyp
 				AvgPrice: existing.AvgPrice,
 			}
 		}
-		
+
 		// Calculate profit/loss
 		trade.ProfitLoss = (token.Price - existing.AvgPrice) * amount
 		trade.AmountOut = proceeds
@@ -145,11 +151,11 @@ func (s *Service) GetTrades() []models.Trade {
 func (s *Service) GetTradeHistory(limit int) []models.Trade {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if limit <= 0 || limit > len(s.trades) {
 		limit = len(s.trades)
 	}
-	
+
 	// Return most recent trades first
 	result := make([]models.Trade, limit)
 	for i := 0; i < limit; i++ {
@@ -200,6 +206,8 @@ func (s *Service) Reset() {
 
 	s.portfolio = &models.Portfolio{
 		ID:            uuid.New().String(),
+		Balance:       s.initialBalance,
+		Currency:      "EUR",
 		ETHBalance:    s.initialBalance,
 		TokenBalances: make(map[string]models.TokenBalance),
 		TotalValue:    s.initialBalance,
