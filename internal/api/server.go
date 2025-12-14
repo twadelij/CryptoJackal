@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"net/http"
 	"time"
@@ -16,6 +17,9 @@ import (
 	"github.com/twadelij/cryptojackal/internal/trading"
 	"go.uber.org/zap"
 )
+
+//go:embed templates/index.html
+var indexHTML embed.FS
 
 // Server is the HTTP API server
 type Server struct {
@@ -34,7 +38,7 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 	}
 
 	router := gin.New()
-	
+
 	// Middleware
 	router.Use(middleware.Recovery(logger))
 	router.Use(middleware.Logger(logger))
@@ -78,11 +82,14 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 		api.GET("/metrics", handler.GetMetrics)
 	}
 
-	// Serve static files for frontend
-	router.Static("/assets", "./web/dist/assets")
-	router.StaticFile("/", "./web/dist/index.html")
+	// Serve embedded frontend
+	router.GET("/", func(c *gin.Context) {
+		data, _ := indexHTML.ReadFile("templates/index.html")
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+	})
 	router.NoRoute(func(c *gin.Context) {
-		c.File("./web/dist/index.html")
+		data, _ := indexHTML.ReadFile("templates/index.html")
+		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})
 
 	return &Server{
@@ -96,7 +103,7 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%s", s.config.ServerHost, s.config.ServerPort)
-	
+
 	s.server = &http.Server{
 		Addr:         addr,
 		Handler:      s.router,

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoJackal - Trading Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
+        .card { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        .btn-primary { background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%); }
+        .btn-primary:hover { background: linear-gradient(135deg, #ff6b6b 0%, #e94560 100%); }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">🐺</span>
+                </div>
+                <h1 class="text-2xl font-bold">CryptoJackal</h1>
+            </div>
+            <div id="status-badge" class="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
+                Loading...
+            </div>
+        </header>
+
+        <!-- Setup Wizard (shown if not configured) -->
+        <div id="setup-wizard" class="hidden">
+            <div class="card rounded-2xl p-8 max-w-2xl mx-auto">
+                <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
+                    Setup Wizard
+                </h2>
+                
+                <!-- Step indicators -->
+                <div class="flex justify-between mb-8">
+                    <div class="step-indicator flex items-center gap-2" data-step="1">
+                        <div class="w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center text-sm font-bold">1</div>
+                        <span class="text-sm">Mode</span>
+                    </div>
+                    <div class="step-indicator flex items-center gap-2 opacity-50" data-step="2">
+                        <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold">2</div>
+                        <span class="text-sm">API Keys</span>
+                    </div>
+                    <div class="step-indicator flex items-center gap-2 opacity-50" data-step="3">
+                        <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold">3</div>
+                        <span class="text-sm">Trading</span>
+                    </div>
+                </div>
+
+                <!-- Step 1: Mode Selection -->
+                <div id="step-1" class="step-content">
+                    <h3 class="text-lg font-semibold mb-4">Select Trading Mode</h3>
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <button onclick="selectMode('paper')" class="mode-btn card p-6 rounded-xl text-left hover:border-pink-500 transition-all" data-mode="paper">
+                            <div class="text-3xl mb-2">📝</div>
+                            <div class="font-bold">Paper Trading</div>
+                            <div class="text-sm text-gray-400">Practice with virtual funds</div>
+                        </button>
+                        <button onclick="selectMode('live')" class="mode-btn card p-6 rounded-xl text-left hover:border-pink-500 transition-all" data-mode="live">
+                            <div class="text-3xl mb-2">💰</div>
+                            <div class="font-bold">Live Trading</div>
+                            <div class="text-sm text-gray-400">Trade with real funds</div>
+                        </button>
+                    </div>
+                    <button onclick="nextStep(2)" class="btn-primary w-full py-3 rounded-lg font-semibold">Continue</button>
+                </div>
+
+                <!-- Step 2: API Keys -->
+                <div id="step-2" class="step-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">API Configuration</h3>
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Ethereum Node URL (optional for paper)</label>
+                            <input type="text" id="eth-node" placeholder="https://mainnet.infura.io/v3/YOUR_KEY" 
+                                class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div id="wallet-section" class="hidden">
+                            <label class="block text-sm text-gray-400 mb-1">Wallet Private Key (live mode only)</label>
+                            <input type="password" id="private-key" placeholder="0x..." 
+                                class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
+                            <p class="text-xs text-yellow-400 mt-1">⚠️ Never share your private key</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <button onclick="prevStep(1)" class="flex-1 py-3 rounded-lg font-semibold border border-white/20 hover:bg-white/5">Back</button>
+                        <button onclick="nextStep(3)" class="flex-1 btn-primary py-3 rounded-lg font-semibold">Continue</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Trading Settings -->
+                <div id="step-3" class="step-content hidden">
+                    <h3 class="text-lg font-semibold mb-4">Trading Settings</h3>
+                    <div class="space-y-4 mb-6">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Initial Balance (Paper Mode)</label>
+                            <input type="number" id="initial-balance" value="10000" 
+                                class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Max Trade Size (USD)</label>
+                            <input type="number" id="max-trade" value="100" 
+                                class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Stop Loss %</label>
+                            <input type="number" id="stop-loss" value="5" 
+                                class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <button onclick="prevStep(2)" class="flex-1 py-3 rounded-lg font-semibold border border-white/20 hover:bg-white/5">Back</button>
+                        <button onclick="saveConfig()" class="flex-1 btn-primary py-3 rounded-lg font-semibold">Save & Start</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard (shown when configured) -->
+        <div id="dashboard" class="hidden">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="card rounded-xl p-4">
+                    <div class="text-gray-400 text-sm mb-1">Balance</div>
+                    <div id="balance" class="text-2xl font-bold">$0.00</div>
+                </div>
+                <div class="card rounded-xl p-4">
+                    <div class="text-gray-400 text-sm mb-1">P&L</div>
+                    <div id="pnl" class="text-2xl font-bold text-green-400">+$0.00</div>
+                </div>
+                <div class="card rounded-xl p-4">
+                    <div class="text-gray-400 text-sm mb-1">Total Trades</div>
+                    <div id="trades" class="text-2xl font-bold">0</div>
+                </div>
+                <div class="card rounded-xl p-4">
+                    <div class="text-gray-400 text-sm mb-1">Win Rate</div>
+                    <div id="winrate" class="text-2xl font-bold">0%</div>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="card rounded-xl p-6 mb-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg">Trading Bot</h3>
+                        <p id="bot-status" class="text-gray-400 text-sm">Status: Stopped</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="startBot()" id="start-btn" class="btn-primary px-6 py-2 rounded-lg font-semibold">Start</button>
+                        <button onclick="stopBot()" id="stop-btn" class="px-6 py-2 rounded-lg font-semibold border border-white/20 hover:bg-white/5 hidden">Stop</button>
+                        <button onclick="showSetup()" class="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/5">
+                            <i data-lucide="settings" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex gap-4 mb-4 border-b border-white/10">
+                <button onclick="showTab('tokens')" class="tab-btn px-4 py-2 border-b-2 border-pink-500 font-semibold" data-tab="tokens">Trending Tokens</button>
+                <button onclick="showTab('opportunities')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white" data-tab="opportunities">Opportunities</button>
+                <button onclick="showTab('history')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white" data-tab="history">Trade History</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div id="tab-tokens" class="tab-content">
+                <div class="card rounded-xl overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-white/5">
+                            <tr>
+                                <th class="text-left p-4 text-gray-400 font-medium">Token</th>
+                                <th class="text-right p-4 text-gray-400 font-medium">Price</th>
+                                <th class="text-right p-4 text-gray-400 font-medium">24h Change</th>
+                                <th class="text-right p-4 text-gray-400 font-medium">Volume</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tokens-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-opportunities" class="tab-content hidden">
+                <div id="opportunities-list" class="space-y-3"></div>
+            </div>
+
+            <div id="tab-history" class="tab-content hidden">
+                <div id="history-list" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let config = { mode: 'paper', configured: false };
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            await checkHealth();
+            await loadPaperBalance();
+            showDashboard();
+            loadTokens();
+        });
+
+        async function checkHealth() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                document.getElementById('status-badge').textContent = data.data.status === 'healthy' ? '● Online' : '○ Offline';
+                document.getElementById('status-badge').className = data.data.status === 'healthy' 
+                    ? 'px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400'
+                    : 'px-3 py-1 rounded-full text-sm bg-red-500/20 text-red-400';
+            } catch (e) {
+                document.getElementById('status-badge').textContent = '○ Offline';
+                document.getElementById('status-badge').className = 'px-3 py-1 rounded-full text-sm bg-red-500/20 text-red-400';
+            }
+        }
+
+        async function loadPaperBalance() {
+            try {
+                const res = await fetch('/api/paper/balance');
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('balance').textContent = '$' + data.data.balance.toFixed(2);
+                    const pnl = data.data.balance - 10000;
+                    document.getElementById('pnl').textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
+                    document.getElementById('pnl').className = 'text-2xl font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadTokens() {
+            try {
+                const res = await fetch('/api/discovery/new');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const tbody = document.getElementById('tokens-list');
+                    tbody.innerHTML = data.data.slice(0, 10).map(t => `
+                        <tr class="border-t border-white/5 hover:bg-white/5">
+                            <td class="p-4">
+                                <div class="font-semibold">${t.symbol}</div>
+                                <div class="text-sm text-gray-400">${t.name}</div>
+                            </td>
+                            <td class="p-4 text-right">$${t.price < 0.01 ? t.price.toExponential(2) : t.price.toFixed(4)}</td>
+                            <td class="p-4 text-right ${t.price_change_24h >= 0 ? 'text-green-400' : 'text-red-400'}">
+                                ${t.price_change_24h >= 0 ? '+' : ''}${t.price_change_24h.toFixed(2)}%
+                            </td>
+                            <td class="p-4 text-right">$${(t.volume_24h/1000).toFixed(1)}K</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function showSetup() {
+            document.getElementById('setup-wizard').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('setup-wizard').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+        }
+
+        function selectMode(mode) {
+            config.mode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('border-pink-500', btn.dataset.mode === mode);
+            });
+            document.getElementById('wallet-section').classList.toggle('hidden', mode === 'paper');
+        }
+
+        function nextStep(step) {
+            document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('step-' + step).classList.remove('hidden');
+            document.querySelectorAll('.step-indicator').forEach(el => {
+                const s = parseInt(el.dataset.step);
+                el.classList.toggle('opacity-50', s > step);
+                el.querySelector('div').className = s <= step 
+                    ? 'w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center text-sm font-bold'
+                    : 'w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-sm font-bold';
+            });
+        }
+
+        function prevStep(step) { nextStep(step); }
+
+        function saveConfig() {
+            config.configured = true;
+            localStorage.setItem('cryptojackal_config', JSON.stringify(config));
+            showDashboard();
+        }
+
+        async function startBot() {
+            try {
+                await fetch('/api/bot/start', { method: 'POST' });
+                document.getElementById('bot-status').textContent = 'Status: Running';
+                document.getElementById('start-btn').classList.add('hidden');
+                document.getElementById('stop-btn').classList.remove('hidden');
+            } catch (e) { console.error(e); }
+        }
+
+        async function stopBot() {
+            try {
+                await fetch('/api/bot/stop', { method: 'POST' });
+                document.getElementById('bot-status').textContent = 'Status: Stopped';
+                document.getElementById('start-btn').classList.remove('hidden');
+                document.getElementById('stop-btn').classList.add('hidden');
+            } catch (e) { console.error(e); }
+        }
+
+        function showTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                const isActive = btn.dataset.tab === tab;
+                btn.className = isActive 
+                    ? 'tab-btn px-4 py-2 border-b-2 border-pink-500 font-semibold'
+                    : 'tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white';
+            });
+        }
+
+        // Auto-refresh
+        setInterval(() => { checkHealth(); loadPaperBalance(); }, 30000);
+    </script>
+</body>
+</html>
