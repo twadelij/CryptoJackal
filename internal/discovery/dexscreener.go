@@ -54,7 +54,7 @@ type dexScreenerPair struct {
 		H24 float64 `json:"h24"`
 	} `json:"priceChange"`
 	TxCount struct {
-		H24 int `json:"h24"`
+		H24 map[string]int `json:"h24"`
 	} `json:"txns"`
 }
 
