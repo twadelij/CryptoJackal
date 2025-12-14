@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -23,8 +24,12 @@ type Wallet struct {
 }
 
 // New creates a new wallet instance
-func New(nodeURL string, privateKeyHex string, chainID int64, logger *zap.Logger) (*Wallet, error) {
-	client, err := ethclient.Dial(nodeURL)
+func New(ctx context.Context, nodeURL string, privateKeyHex string, chainID int64, logger *zap.Logger) (*Wallet, error) {
+	// Ensure node dial never blocks startup indefinitely.
+	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	client, err := ethclient.DialContext(dialCtx, nodeURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ethereum node: %w", err)
 	}

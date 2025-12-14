@@ -43,13 +43,15 @@ func main() {
 
 	// Initialize wallet (optional for paper trading)
 	var w *wallet.Wallet
-	if cfg.NodeURL != "" {
-		w, err = wallet.New(cfg.NodeURL, cfg.PrivateKey, cfg.ChainID, logger)
+	if !cfg.PaperTradingMode && cfg.NodeURL != "" {
+		w, err = wallet.New(context.Background(), cfg.NodeURL, cfg.PrivateKey, cfg.ChainID, logger)
 		if err != nil {
-			logger.Warn("wallet initialization failed, continuing in paper mode only", zap.Error(err))
+			logger.Warn("wallet initialization failed, continuing without live trading", zap.Error(err))
 		} else {
 			logger.Info("wallet initialized", zap.String("address", w.Address().Hex()))
 		}
+	} else {
+		logger.Info("paper trading mode enabled; skipping wallet initialization")
 	}
 
 	// Initialize services
