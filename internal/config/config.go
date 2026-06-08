@@ -1,11 +1,13 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/twadelij/cryptojackal/internal/storage"
 )
 
 type Config struct {
@@ -143,4 +145,87 @@ func getEnvBool(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+// LoadFromStorage overrides config values with those stored in the database
+func (c *Config) LoadFromStorage(store *storage.Storage) error {
+	configs, err := store.GetAllConfigs()
+	if err != nil {
+		return err
+	}
+
+	for key, value := range configs {
+		switch key {
+		case "paper_trading_mode":
+			if v, err := strconv.ParseBool(value); err == nil {
+				c.PaperTradingMode = v
+			}
+		case "initial_balance":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				c.InitialBalance = v
+			}
+		case "trade_amount":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				c.TradeAmount = v
+			}
+		case "max_slippage":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				c.MaxSlippage = v
+			}
+		case "min_liquidity":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				c.MinLiquidity = v
+			}
+		case "max_price_impact":
+			if v, err := strconv.ParseFloat(value, 64); err == nil {
+				c.MaxPriceImpact = v
+			}
+		case "scan_interval_seconds":
+			if v, err := strconv.Atoi(value); err == nil {
+				c.ScanInterval = time.Duration(v) * time.Second
+			}
+		case "gas_limit":
+			if v, err := strconv.Atoi(value); err == nil {
+				c.GasLimit = uint64(v)
+			}
+		case "max_gas_price_gwei":
+			if v, err := strconv.Atoi(value); err == nil {
+				c.MaxGasPrice = uint64(v)
+			}
+		case "eth_node_url":
+			c.NodeURL = value
+		case "chain_id":
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				c.ChainID = v
+			}
+		case "environment":
+			c.Environment = value
+		}
+	}
+	return nil
+}
+
+// SaveToStorage persists the current config values to the database
+func (c *Config) SaveToStorage(store *storage.Storage) error {
+	pairs := map[string]string{
+		"paper_trading_mode":      fmt.Sprintf("%t", c.PaperTradingMode),
+		"initial_balance":         fmt.Sprintf("%f", c.InitialBalance),
+		"trade_amount":            fmt.Sprintf("%f", c.TradeAmount),
+		"max_slippage":            fmt.Sprintf("%f", c.MaxSlippage),
+		"min_liquidity":           fmt.Sprintf("%f", c.MinLiquidity),
+		"max_price_impact":        fmt.Sprintf("%f", c.MaxPriceImpact),
+		"scan_interval_seconds":   fmt.Sprintf("%d", int(c.ScanInterval.Seconds())),
+		"gas_limit":               fmt.Sprintf("%d", c.GasLimit),
+		"max_gas_price_gwei":      fmt.Sprintf("%d", c.MaxGasPrice),
+		"eth_node_url":            c.NodeURL,
+		"chain_id":                fmt.Sprintf("%d", c.ChainID),
+		"environment":             c.Environment,
+	}
+
+	for key, value := range pairs {
+		if err := store.SetConfig(key, value); err != nil {
+			return fmt.Errorf("failed to save config %s: %w", key, err)
+		}
+	}
+	return nil
 }

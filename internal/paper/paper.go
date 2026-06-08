@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/twadelij/cryptojackal/internal/models"
+	"github.com/twadelij/cryptojackal/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -18,6 +19,7 @@ type Service struct {
 	trades         []models.Trade
 	initialBalance float64
 	logger         *zap.Logger
+	storage        *storage.Storage
 }
 
 // NewService creates a new paper trading service
@@ -36,6 +38,72 @@ func NewService(initialBalance float64, logger *zap.Logger) *Service {
 		initialBalance: initialBalance,
 		logger:         logger,
 	}
+}
+
+// NewServiceWithStorage creates a new paper trading service with SQLite persistence
+func NewServiceWithStorage(initialBalance float64, logger *zap.Logger, store *storage.Storage) *Service {
+	s := &Service{
+		initialBalance: initialBalance,
+		logger:         logger,
+		storage:        store,
+	}
+
+	// Try to load existing portfolio from storage
+	if store != nil {
+		portfolios, err := s.loadAllPortfolios()
+		if err != nil {
+			logger.Warn("failed to load portfolios from storage", zap.Error(err))
+		}
+		if len(portfolios) > 0 {
+			s.portfolio = portfolios[0]
+			logger.Info("loaded portfolio from storage",
+				zap.String("id", s.portfolio.ID),
+				zap.Float64("balance", s.portfolio.Balance))
+		}
+
+		// Load trades
+		trades, err := store.GetTrades(0)
+		if err != nil {
+			logger.Warn("failed to load trades from storage", zap.Error(err))
+		} else {
+			s.trades = trades
+			logger.Info("loaded trades from storage", zap.Int("count", len(trades)))
+		}
+	}
+
+	if s.portfolio == nil {
+		s.portfolio = &models.Portfolio{
+			ID:            uuid.New().String(),
+			Balance:       initialBalance,
+			Currency:      "EUR",
+			ETHBalance:    initialBalance,
+			TokenBalances: make(map[string]models.TokenBalance),
+			TotalValue:    initialBalance,
+			UpdatedAt:     time.Now(),
+		}
+		s.trades = make([]models.Trade, 0)
+	}
+
+	return s
+}
+
+// loadAllPortfolios loads all portfolios from storage (helper for startup)
+func (s *Service) loadAllPortfolios() ([]*models.Portfolio, error) {
+	if s.storage == nil {
+		return nil, nil
+	}
+	// Since we store only one portfolio, try loading with a known ID.
+	// If no portfolio exists yet, return nil.
+	if s.portfolio != nil {
+		portfolio, _, err := s.storage.LoadPortfolio(s.portfolio.ID)
+		if err != nil {
+			return nil, err
+		}
+		if portfolio != nil {
+			return []*models.Portfolio{portfolio}, nil
+		}
+	}
+	return nil, nil
 }
 
 // GetPortfolio returns the current portfolio
@@ -130,6 +198,16 @@ func (s *Service) ExecuteTrade(ctx context.Context, token models.Token, tradeTyp
 	s.trades = append(s.trades, *trade)
 	s.portfolio.UpdatedAt = time.Now()
 
+	// Persist to storage
+	if s.storage != nil {
+		if err := s.storage.SaveTrade(trade); err != nil {
+			s.logger.Warn("failed to save trade to storage", zap.Error(err))
+		}
+		if err := s.storage.SavePortfolio(s.portfolio, s.initialBalance); err != nil {
+			s.logger.Warn("failed to save portfolio to storage", zap.Error(err))
+		}
+	}
+
 	s.logger.Info("paper trade executed",
 		zap.String("type", string(tradeType)),
 		zap.String("token", token.Symbol),
@@ -214,6 +292,13 @@ func (s *Service) Reset() {
 		UpdatedAt:     time.Now(),
 	}
 	s.trades = make([]models.Trade, 0)
+
+	// Persist reset state
+	if s.storage != nil {
+		if err := s.storage.SavePortfolio(s.portfolio, s.initialBalance); err != nil {
+			s.logger.Warn("failed to save reset portfolio to storage", zap.Error(err))
+		}
+	}
 
 	s.logger.Info("paper trading portfolio reset", zap.Float64("balance", s.initialBalance))
 }

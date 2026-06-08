@@ -14,6 +14,7 @@ import (
 	"github.com/twadelij/cryptojackal/internal/config"
 	"github.com/twadelij/cryptojackal/internal/discovery"
 	"github.com/twadelij/cryptojackal/internal/paper"
+	"github.com/twadelij/cryptojackal/internal/storage"
 	"github.com/twadelij/cryptojackal/internal/trading"
 	"go.uber.org/zap"
 )
@@ -31,7 +32,7 @@ type Server struct {
 }
 
 // NewServer creates a new API server
-func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Service, paperSvc *paper.Service, logger *zap.Logger) *Server {
+func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Service, paperSvc *paper.Service, store *storage.Storage, logger *zap.Logger) *Server {
 	// Set gin mode based on environment
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -51,7 +52,7 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 		MaxAge:           12 * time.Hour,
 	}))
 
-	handler := handlers.NewHandler(cfg, engine, disc, paperSvc, logger)
+	handler := handlers.NewHandler(cfg, engine, disc, paperSvc, store, logger)
 
 	// Routes
 	api := router.Group("/api")

@@ -8,6 +8,7 @@ import (
 	"github.com/twadelij/cryptojackal/internal/discovery"
 	"github.com/twadelij/cryptojackal/internal/models"
 	"github.com/twadelij/cryptojackal/internal/paper"
+	"github.com/twadelij/cryptojackal/internal/storage"
 	"github.com/twadelij/cryptojackal/internal/trading"
 	"go.uber.org/zap"
 )
@@ -18,16 +19,18 @@ type Handler struct {
 	engine    *trading.Engine
 	discovery *discovery.Service
 	paper     *paper.Service
+	storage   *storage.Storage
 	logger    *zap.Logger
 }
 
 // NewHandler creates a new handler
-func NewHandler(cfg *config.Config, engine *trading.Engine, disc *discovery.Service, paperSvc *paper.Service, logger *zap.Logger) *Handler {
+func NewHandler(cfg *config.Config, engine *trading.Engine, disc *discovery.Service, paperSvc *paper.Service, store *storage.Storage, logger *zap.Logger) *Handler {
 	return &Handler{
 		config:    cfg,
 		engine:    engine,
 		discovery: disc,
 		paper:     paperSvc,
+		storage:   store,
 		logger:    logger,
 	}
 }
@@ -283,7 +286,13 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 		h.config.NodeURL = req.EthNodeURL
 	}
 
-	// TODO: persist to file (Phase 3)
+	// Persist to storage
+	if h.storage != nil {
+		if err := h.config.SaveToStorage(h.storage); err != nil {
+			h.logger.Warn("failed to persist config", zap.Error(err))
+		}
+	}
+
 	h.logger.Info("configuration updated",
 		zap.Bool("paper_mode", req.PaperTradingMode),
 		zap.Float64("initial_balance", req.InitialBalance),
