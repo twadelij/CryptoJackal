@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/twadelij/cryptojackal/internal/config"
 	"github.com/twadelij/cryptojackal/internal/discovery"
 	"github.com/twadelij/cryptojackal/internal/models"
@@ -299,4 +301,47 @@ func (h *Handler) UpdateConfig(c *gin.Context) {
 	)
 
 	c.JSON(http.StatusOK, Response{Success: true, Data: "Config updated"})
+}
+
+// LoginRequest is the request body for login
+// swagger:model LoginRequest
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// Login handles user authentication and returns a JWT token
+func (h *Handler) Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	// For single-user setup, only check password (username is ignored)
+	if req.Password != h.config.AdminPassword {
+		c.JSON(http.StatusUnauthorized, Response{Success: false, Error: "invalid credentials"})
+		return
+	}
+
+	// Generate JWT token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": "admin",
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
+		"iat": time.Now().Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(h.config.JWTSecret))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: gin.H{
+			"token": tokenString,
+			"type":  "Bearer",
+		},
+	})
 }

@@ -2,12 +2,58 @@ import type { ApiResponse, BotStatus, Config, Metrics, Portfolio, Token, Trade }
 
 const API_BASE = '/api';
 
+function getToken(): string | null {
+  return localStorage.getItem('cj_token');
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string> || {}),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(url, {
+    ...options,
+    headers,
+  });
+
+  if (res.status === 401) {
+    localStorage.removeItem('cj_token');
+    window.location.href = '/login';
+    throw new Error('Session expired. Please log in again.');
+  }
+
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
   return res.json();
+}
+
+export async function login(username: string, password: string): Promise<{ token: string; type: string }> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Login failed');
+  }
+  const data = await res.json();
+  if (data.success && data.data?.token) {
+    localStorage.setItem('cj_token', data.data.token);
+    return data.data;
+  }
+  throw new Error('Invalid response from server');
+}
+
+export function logout() {
+  localStorage.removeItem('cj_token');
+  window.location.href = '/login';
 }
 
 export async function getHealth(): Promise<ApiResponse<{ status: string; version: string }>> {

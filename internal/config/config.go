@@ -45,6 +45,7 @@ type Config struct {
 
 	// Security
 	JWTSecret         string
+	AdminPassword     string
 	CORSOrigins       []string
 
 	// Redis
@@ -91,8 +92,9 @@ func Load() (*Config, error) {
 		DiscordWebhookURL: getEnv("DISCORD_WEBHOOK_URL", ""),
 
 		// Security
-		JWTSecret:   getEnv("JWT_SECRET", "change-me-in-production"),
-		CORSOrigins: []string{getEnv("CORS_ORIGINS", "*")},
+		JWTSecret:     getEnv("JWT_SECRET", "change-me-in-production"),
+		AdminPassword: getEnv("ADMIN_PASSWORD", "admin"),
+		CORSOrigins:   []string{getEnv("CORS_ORIGINS", "*")},
 
 		// Redis
 		RedisURL: getEnv("REDIS_URL", "redis://localhost:6379"),

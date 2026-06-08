@@ -57,36 +57,42 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 	// Routes
 	api := router.Group("/api")
 	{
-		// Health
+		// Public routes (no auth required)
 		api.GET("/health", handler.Health)
+		api.POST("/auth/login", handler.Login)
 
-		// Config
-		api.GET("/config", handler.GetConfig)
-		api.POST("/config", handler.UpdateConfig)
+		// Protected routes (JWT required)
+		protected := api.Group("/")
+		protected.Use(middleware.JWTAuth(cfg.JWTSecret))
+		{
+			// Config
+			protected.GET("/config", handler.GetConfig)
+			protected.POST("/config", handler.UpdateConfig)
 
-		// Bot control
-		api.GET("/bot/status", handler.GetStatus)
-		api.POST("/bot/start", handler.StartBot)
-		api.POST("/bot/stop", handler.StopBot)
+			// Bot control
+			protected.GET("/bot/status", handler.GetStatus)
+			protected.POST("/bot/start", handler.StartBot)
+			protected.POST("/bot/stop", handler.StopBot)
 
-		// Trading
-		api.GET("/trading/opportunities", handler.GetOpportunities)
-		api.POST("/trading/execute", handler.ExecuteTrade)
-		api.GET("/trading/history", handler.GetTradingHistory)
+			// Trading
+			protected.GET("/trading/opportunities", handler.GetOpportunities)
+			protected.POST("/trading/execute", handler.ExecuteTrade)
+			protected.GET("/trading/history", handler.GetTradingHistory)
 
-		// Discovery
-		api.GET("/discovery/trending", handler.GetTrendingTokens)
-		api.GET("/discovery/new", handler.GetNewTokens)
-		api.GET("/discovery/analyze/:address", handler.AnalyzeToken)
+			// Discovery
+			protected.GET("/discovery/trending", handler.GetTrendingTokens)
+			protected.GET("/discovery/new", handler.GetNewTokens)
+			protected.GET("/discovery/analyze/:address", handler.AnalyzeToken)
 
-		// Paper trading
-		api.GET("/paper/balance", handler.GetPaperBalance)
-		api.POST("/paper/reset", handler.ResetPaperBalance)
-		api.POST("/paper/trade", handler.ExecutePaperTrade)
-		api.GET("/paper/history", handler.GetTradingHistory)
+			// Paper trading
+			protected.GET("/paper/balance", handler.GetPaperBalance)
+			protected.POST("/paper/reset", handler.ResetPaperBalance)
+			protected.POST("/paper/trade", handler.ExecutePaperTrade)
+			protected.GET("/paper/history", handler.GetTradingHistory)
 
-		// Metrics
-		api.GET("/metrics", handler.GetMetrics)
+			// Metrics
+			protected.GET("/metrics", handler.GetMetrics)
+		}
 	}
 
 	// Serve embedded frontend

@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Search, Wallet, History, Settings, Activity, HelpCircle } from 'lucide-react'
+import { LayoutDashboard, Search, Wallet, History, Settings, Activity, HelpCircle, LogOut } from 'lucide-react'
 import { useEffect } from 'react'
 import Dashboard from './pages/Dashboard'
 import SetupWizard from './pages/SetupWizard'
@@ -7,22 +7,41 @@ import Tokens from './pages/Tokens'
 import Portfolio from './pages/Portfolio'
 import TradeHistory from './pages/TradeHistory'
 import Help from './pages/Help'
+import Login from './pages/Login'
+import { logout } from './lib/api'
 import * as api from './lib/api'
 
-function Layout() {
+function App() {
   const navigate = useNavigate()
   const location = useLocation()
+  const token = localStorage.getItem('cj_token')
+  const isLoginPage = location.pathname === '/login'
 
   useEffect(() => {
+    // Redirect to login if no token and not already on login page
+    if (!token && !isLoginPage) {
+      navigate('/login')
+      return
+    }
+
     // Redirect to setup if live mode is active but no ETH node configured
-    if (location.pathname !== '/setup') {
+    if (token && location.pathname !== '/setup' && location.pathname !== '/login') {
       api.getConfig().then(res => {
         if (res.success && res.data && !res.data.paper_trading_mode && !res.data.eth_node_url) {
           navigate('/setup')
         }
       }).catch(() => {})
     }
-  }, [location.pathname, navigate])
+  }, [location.pathname, navigate, token, isLoginPage])
+
+  // Show login page without sidebar
+  if (isLoginPage) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    )
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -42,8 +61,15 @@ function Layout() {
           <NavItem to="/help" icon={<HelpCircle size={20} />} label="Help" />
         </div>
 
-        <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-2 text-sm text-gray-400">
+        <div className="p-4 border-t border-white/10 space-y-2">
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 px-4 py-2 mx-2 w-[calc(100%-1rem)] rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <LogOut size={20} />
+            <span className="hidden md:block">Logout</span>
+          </button>
+          <div className="flex items-center gap-2 text-sm text-gray-400 px-4">
             <Activity size={16} />
             <span className="hidden md:inline">v1.0.0</span>
           </div>
@@ -83,4 +109,4 @@ function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
   )
 }
 
-export default Layout
+export default App
