@@ -1,20 +1,35 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Wallet, History, Settings, Activity } from 'lucide-react'
+import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, Search, Wallet, History, Settings, Activity, HelpCircle } from 'lucide-react'
+import { useEffect } from 'react'
 import Dashboard from './pages/Dashboard'
 import SetupWizard from './pages/SetupWizard'
 import Tokens from './pages/Tokens'
 import Portfolio from './pages/Portfolio'
 import TradeHistory from './pages/TradeHistory'
+import Help from './pages/Help'
+import * as api from './lib/api'
 
 function Layout() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    // Redirect to setup if live mode is active but no ETH node configured
+    if (location.pathname !== '/setup') {
+      api.getConfig().then(res => {
+        if (res.success && res.data && !res.data.paper_trading_mode && !res.data.eth_node_url) {
+          navigate('/setup')
+        }
+      }).catch(() => {})
+    }
+  }, [location.pathname, navigate])
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <nav className="w-16 md:w-56 bg-jackal-dark/80 border-r border-white/10 flex flex-col">
         <div className="p-4 flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-            <span className="text-xl">🐺</span>
-          </div>
+          <img src="/logo.png" alt="CryptoJackal" className="w-10 h-10 rounded-lg" />
           <span className="font-bold text-lg hidden md:block">CryptoJackal</span>
         </div>
 
@@ -24,6 +39,7 @@ function Layout() {
           <NavItem to="/portfolio" icon={<Wallet size={20} />} label="Portfolio" />
           <NavItem to="/history" icon={<History size={20} />} label="History" />
           <NavItem to="/setup" icon={<Settings size={20} />} label="Setup" />
+          <NavItem to="/help" icon={<HelpCircle size={20} />} label="Help" />
         </div>
 
         <div className="p-4 border-t border-white/10">
@@ -42,6 +58,7 @@ function Layout() {
           <Route path="/tokens" element={<Tokens />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/history" element={<TradeHistory />} />
+          <Route path="/help" element={<Help />} />
         </Routes>
       </main>
     </div>
