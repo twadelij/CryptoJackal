@@ -133,3 +133,12 @@ export async function analyzeToken(address: string): Promise<ApiResponse<Token>>
 export async function getMetrics(): Promise<ApiResponse<Metrics>> {
   return fetchJson(`${API_BASE}/metrics`);
 }
+
+export interface ExternalHealth {
+  coingecko: boolean;
+  dexscreener: boolean;
+}
+
+export async function getExternalHealth(): Promise<ApiResponse<ExternalHealth>> {
+  return fetchJson(`${API_BASE}/health/external`);
+}

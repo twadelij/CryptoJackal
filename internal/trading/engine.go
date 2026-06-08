@@ -136,6 +136,16 @@ func (e *Engine) ExecuteTrade(ctx context.Context, opportunity models.TradingOpp
 }
 
 func (e *Engine) runLoop(ctx context.Context) {
+	// Recover from panics so the bot doesn't crash
+	defer func() {
+		if r := recover(); r != nil {
+			e.logger.Error("trading engine panic recovered", zap.Any("panic", r))
+			e.mu.Lock()
+			e.isRunning = false
+			e.mu.Unlock()
+		}
+	}()
+
 	ticker := time.NewTicker(e.config.ScanInterval)
 	defer ticker.Stop()
 
@@ -159,8 +169,9 @@ func (e *Engine) scan(ctx context.Context) {
 
 	opportunities, err := e.discovery.FindOpportunities(ctx, "ethereum", e.config.MinLiquidity)
 	if err != nil {
-		e.logger.Error("failed to find opportunities", zap.Error(err))
-		return
+		e.logger.Warn("failed to find opportunities", zap.Error(err))
+		// Don't stop; the bot can still run with manual trades
+		opportunities = []models.TradingOpportunity{}
 	}
 
 	e.mu.Lock()

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Pause, TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react';
+import { Play, Pause, TrendingUp, TrendingDown, DollarSign, BarChart3, Wifi, WifiOff, Clock, Zap } from 'lucide-react';
 import { useFetch } from '../hooks/useApi';
 import * as api from '../lib/api';
 import { Toast } from '../components/Toast';
@@ -11,6 +11,7 @@ export default function Dashboard() {
   const { data: statusData, refetch: refetchStatus } = useFetch(() => api.getBotStatus().then(r => r.data as BotStatus), 5000);
   const { data: portfolioData, refetch: refetchPortfolio } = useFetch(() => api.getPaperBalance().then(r => r.data as Portfolio), 10000);
   const { data: metricsData, refetch: refetchMetrics } = useFetch(() => api.getMetrics().then(r => r.data as Metrics), 10000);
+  const { data: healthData } = useFetch(() => api.getExternalHealth().then(r => r.data as api.ExternalHealth), 30000);
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -94,7 +95,27 @@ export default function Dashboard() {
                 {status?.is_running ? 'Running' : 'Stopped'}
               </span>
               {status?.mode && ` • ${status.mode === 'paper' ? 'Paper Trading' : 'Live Trading'}`}
+              {status?.started_at && (
+                <span className="ml-2">
+                  <Clock size={14} className="inline mr-1" />
+                  {new Date(status.started_at).toLocaleTimeString('nl-NL')}
+                </span>
+              )}
             </p>
+            <div className="flex items-center gap-3 mt-2 text-xs">
+              <span className="flex items-center gap-1 text-gray-500">
+                <Zap size={12} />
+                APIs:
+              </span>
+              <span className={`flex items-center gap-1 ${healthData?.coingecko ? 'text-green-400' : 'text-red-400'}`}>
+                {healthData?.coingecko ? <Wifi size={12} /> : <WifiOff size={12} />}
+                CoinGecko
+              </span>
+              <span className={`flex items-center gap-1 ${healthData?.dexscreener ? 'text-green-400' : 'text-red-400'}`}>
+                {healthData?.dexscreener ? <Wifi size={12} /> : <WifiOff size={12} />}
+                DexScreener
+              </span>
+            </div>
           </div>
           <div className="flex gap-3">
             {!status?.is_running ? (

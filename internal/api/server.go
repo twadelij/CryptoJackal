@@ -92,6 +92,9 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 
 			// Metrics
 			protected.GET("/metrics", handler.GetMetrics)
+
+			// External API health
+			protected.GET("/health/external", handler.GetExternalHealth)
 		}
 	}
 

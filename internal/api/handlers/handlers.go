@@ -227,6 +227,12 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{Success: true, Data: metrics})
 }
 
+// GetExternalHealth returns the health of external APIs (CoinGecko, DexScreener)
+func (h *Handler) GetExternalHealth(c *gin.Context) {
+	status := h.discovery.Health(c.Request.Context())
+	c.JSON(http.StatusOK, Response{Success: true, Data: status})
+}
+
 // ConfigUpdateRequest is the request body for updating configuration
 type ConfigUpdateRequest struct {
 	PaperTradingMode bool    `json:"paper_trading_mode"`
