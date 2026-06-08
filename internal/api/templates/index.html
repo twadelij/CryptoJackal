@@ -258,7 +258,10 @@
                     document.getElementById('pnl').textContent = (pnl >= 0 ? '+€' : '-€') + Math.abs(pnl).toFixed(2);
                     document.getElementById('pnl').className = 'text-2xl font-bold ' + (pnl >= 0 ? 'text-green-400' : 'text-red-400');
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('Failed to load balance:', e);
+                showNotification('Kon balans niet laden. Check of de server draait.', 'error');
+            }
         }
         
         async function loadMetrics() {
@@ -269,7 +272,10 @@
                     document.getElementById('trades').textContent = data.data.total_trades || 0;
                     document.getElementById('winrate').textContent = ((data.data.win_rate || 0) * 100).toFixed(0) + '%';
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('Failed to load metrics:', e);
+                showNotification('Kon metrics niet laden.', 'error');
+            }
         }
 
         let tokens = [];
@@ -298,7 +304,10 @@
                         </tr>
                     `).join('');
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('Failed to load tokens:', e);
+                showNotification('Kon tokens niet laden. API rate limit?', 'error');
+            }
         }
         
         let selectedToken = null;
@@ -404,7 +413,10 @@
                         </div>
                     `).join('');
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) {
+                console.error('Failed to load history:', e);
+                showNotification('Kon trade history niet laden.', 'error');
+            }
         }
 
         function showSetup() {
@@ -439,28 +451,65 @@
 
         function prevStep(step) { nextStep(step); }
 
-        function saveConfig() {
+        async function saveConfig() {
             config.configured = true;
-            localStorage.setItem('cryptojackal_config', JSON.stringify(config));
-            showDashboard();
+            config.initial_balance = parseFloat(document.getElementById('initial-balance').value) || 10000;
+            config.trade_amount = parseFloat(document.getElementById('max-trade').value) || 100;
+            config.stop_loss = parseFloat(document.getElementById('stop-loss').value) || 5;
+
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paper_trading_mode: config.mode === 'paper',
+                        initial_balance: config.initial_balance,
+                        eth_node_url: document.getElementById('eth-node').value,
+                        trade_amount: config.trade_amount,
+                        max_slippage: 0.5,
+                        stop_loss: config.stop_loss
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('cryptojackal_config', JSON.stringify(config));
+                    showNotification('Config opgeslagen!', 'success');
+                    showDashboard();
+                } else {
+                    showNotification(data.error || 'Config opslaan mislukt', 'error');
+                }
+            } catch (e) {
+                console.error('Failed to save config:', e);
+                showNotification('Kon config niet opslaan. Server offline?', 'error');
+            }
         }
 
         async function startBot() {
             try {
-                await fetch('/api/bot/start', { method: 'POST' });
+                const res = await fetch('/api/bot/start', { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 document.getElementById('bot-status').textContent = 'Status: Running';
                 document.getElementById('start-btn').classList.add('hidden');
                 document.getElementById('stop-btn').classList.remove('hidden');
-            } catch (e) { console.error(e); }
+                showNotification('Bot gestart!', 'success');
+            } catch (e) {
+                console.error('Failed to start bot:', e);
+                showNotification('Kon bot niet starten.', 'error');
+            }
         }
 
         async function stopBot() {
             try {
-                await fetch('/api/bot/stop', { method: 'POST' });
+                const res = await fetch('/api/bot/stop', { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 document.getElementById('bot-status').textContent = 'Status: Stopped';
                 document.getElementById('start-btn').classList.remove('hidden');
                 document.getElementById('stop-btn').classList.add('hidden');
-            } catch (e) { console.error(e); }
+                showNotification('Bot gestopt!', 'success');
+            } catch (e) {
+                console.error('Failed to stop bot:', e);
+                showNotification('Kon bot niet stoppen.', 'error');
+            }
         }
 
         function showTab(tab) {

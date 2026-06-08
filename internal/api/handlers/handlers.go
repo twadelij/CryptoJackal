@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/twadelij/cryptojackal/internal/config"
 	"github.com/twadelij/cryptojackal/internal/discovery"
 	"github.com/twadelij/cryptojackal/internal/models"
 	"github.com/twadelij/cryptojackal/internal/paper"
@@ -13,6 +14,7 @@ import (
 
 // Handler contains all HTTP handlers
 type Handler struct {
+	config    *config.Config
 	engine    *trading.Engine
 	discovery *discovery.Service
 	paper     *paper.Service
@@ -20,8 +22,9 @@ type Handler struct {
 }
 
 // NewHandler creates a new handler
-func NewHandler(engine *trading.Engine, disc *discovery.Service, paperSvc *paper.Service, logger *zap.Logger) *Handler {
+func NewHandler(cfg *config.Config, engine *trading.Engine, disc *discovery.Service, paperSvc *paper.Service, logger *zap.Logger) *Handler {
 	return &Handler{
+		config:    cfg,
 		engine:    engine,
 		discovery: disc,
 		paper:     paperSvc,
@@ -217,4 +220,74 @@ func (h *Handler) ExecutePaperTrade(c *gin.Context) {
 func (h *Handler) GetMetrics(c *gin.Context) {
 	metrics := h.paper.GetMetrics()
 	c.JSON(http.StatusOK, Response{Success: true, Data: metrics})
+}
+
+// ConfigUpdateRequest is the request body for updating configuration
+type ConfigUpdateRequest struct {
+	PaperTradingMode bool    `json:"paper_trading_mode"`
+	InitialBalance   float64 `json:"initial_balance"`
+	EthNodeURL       string  `json:"eth_node_url"`
+	TradeAmount      float64 `json:"trade_amount"`
+	MaxSlippage      float64 `json:"max_slippage"`
+	StopLoss         float64 `json:"stop_loss"`
+}
+
+// GetConfig returns the current configuration without sensitive fields
+func (h *Handler) GetConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: gin.H{
+			"paper_trading_mode": h.config.PaperTradingMode,
+			"initial_balance":    h.config.InitialBalance,
+			"trade_amount":       h.config.TradeAmount,
+			"max_slippage":       h.config.MaxSlippage,
+			"min_liquidity":      h.config.MinLiquidity,
+			"max_price_impact":   h.config.MaxPriceImpact,
+			"scan_interval_sec":  int(h.config.ScanInterval.Seconds()),
+			"gas_limit":          h.config.GasLimit,
+			"max_gas_price":      h.config.MaxGasPrice,
+			"environment":        h.config.Environment,
+		},
+	})
+}
+
+// UpdateConfig updates the runtime configuration
+func (h *Handler) UpdateConfig(c *gin.Context) {
+	var req ConfigUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	// Validate
+	if req.InitialBalance < 0 {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "initial balance must be non-negative"})
+		return
+	}
+	if req.TradeAmount <= 0 {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "trade amount must be positive"})
+		return
+	}
+	if req.MaxSlippage < 0 || req.MaxSlippage > 100 {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "max slippage must be between 0 and 100"})
+		return
+	}
+
+	// Update config in-place
+	h.config.PaperTradingMode = req.PaperTradingMode
+	h.config.InitialBalance = req.InitialBalance
+	h.config.TradeAmount = req.TradeAmount
+	h.config.MaxSlippage = req.MaxSlippage
+
+	if req.EthNodeURL != "" {
+		h.config.NodeURL = req.EthNodeURL
+	}
+
+	// TODO: persist to file (Phase 3)
+	h.logger.Info("configuration updated",
+		zap.Bool("paper_mode", req.PaperTradingMode),
+		zap.Float64("initial_balance", req.InitialBalance),
+	)
+
+	c.JSON(http.StatusOK, Response{Success: true, Data: "Config updated"})
 }

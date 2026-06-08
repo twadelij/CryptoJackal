@@ -51,13 +51,17 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 		MaxAge:           12 * time.Hour,
 	}))
 
-	handler := handlers.NewHandler(engine, disc, paperSvc, logger)
+	handler := handlers.NewHandler(cfg, engine, disc, paperSvc, logger)
 
 	// Routes
 	api := router.Group("/api")
 	{
 		// Health
 		api.GET("/health", handler.Health)
+
+		// Config
+		api.GET("/config", handler.GetConfig)
+		api.POST("/config", handler.UpdateConfig)
 
 		// Bot control
 		api.GET("/bot/status", handler.GetStatus)
