@@ -5,6 +5,8 @@ import (
 	"embed"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -98,12 +100,25 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 		}
 	}
 
-	// Serve embedded frontend
+	// Serve embedded frontend (fallback when web/dist is not built)
 	router.GET("/", func(c *gin.Context) {
 		data, _ := indexHTML.ReadFile("templates/index.html")
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})
+
+	// Serve static frontend files if web/dist exists (production build)
+	if _, err := os.Stat("web/dist"); err == nil {
+		router.Static("/assets", "web/dist/assets")
+		router.StaticFile("/favicon.ico", "web/dist/favicon.ico")
+	}
+
 	router.NoRoute(func(c *gin.Context) {
+		// API 404s should return JSON
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "not found"})
+			return
+		}
+		// All other 404s serve the frontend (SPA routing)
 		data, _ := indexHTML.ReadFile("templates/index.html")
 		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 	})

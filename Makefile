@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker demo
+.PHONY: build run dev test clean docker demo all
 
 # Build the application
 build:
@@ -8,6 +8,14 @@ build:
 # Run the application
 run:
 	go run ./cmd/cryptojackal
+
+# Run both backend and frontend in dev mode (parallel)
+dev:
+	@echo "Starting backend on :8080 and frontend on :3000..."
+	@trap 'kill %1 %2 2>/dev/null; exit' INT; \
+	go run ./cmd/cryptojackal & \
+	cd web && npm run dev & \
+	wait
 
 # Run the demo
 demo:

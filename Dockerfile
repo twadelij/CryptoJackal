@@ -4,7 +4,7 @@ FROM golang:1.22-alpine AS builder
 WORKDIR /app
 
 # Install build dependencies
-RUN apk add --no-cache git ca-certificates
+RUN apk add --no-cache git ca-certificates nodejs npm
 
 # Copy go mod files
 COPY go.mod go.sum* ./
@@ -15,7 +15,10 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
+# Build frontend
+RUN cd web && npm install && npm run build
+
+# Build the Go application
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /cryptojackal ./cmd/cryptojackal
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /demo ./cmd/demo
 
@@ -33,6 +36,9 @@ WORKDIR /app
 # Copy binaries from builder
 COPY --from=builder /cryptojackal /usr/local/bin/cryptojackal
 COPY --from=builder /demo /usr/local/bin/demo
+
+# Copy built frontend so Go static file serving works
+COPY --from=builder /app/web/dist ./web/dist
 
 # Copy configuration
 COPY .env.example .env.example

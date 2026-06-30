@@ -11,39 +11,49 @@ A cryptocurrency trading bot with a web dashboard. Built in Go with a React fron
 
 ## Quick Start
 
-### Run the Backend
+### Option 1: Docker (easiest)
 
 ```bash
-# Copy the example config
+git clone https://github.com/twadelij/CryptoJackal.git
+cd CryptoJackal
 cp .env.example .env
-
-# Paper trading is already enabled by default
-go run ./cmd/cryptojackal
+docker compose up --build
 ```
 
-The backend runs on `http://localhost:8080`.
+Open `http://localhost:8080` and log in with password from `.env` (default: `admin`).
 
-### Run the Web Dashboard (optional)
+### Option 2: Local Development
+
+Requires: Go 1.22+, Node.js 20+, npm
 
 ```bash
-cd web
-npm install
-npm run dev
+git clone https://github.com/twadelij/CryptoJackal.git
+cd CryptoJackal
+cp .env.example .env
+make dev
 ```
 
-The dashboard opens on `http://localhost:3000`.
+This starts the backend on `http://localhost:8080` and the frontend on `http://localhost:3000`.
 
-### Run Everything with Docker
+### Option 3: Build and Run
 
 ```bash
-docker compose up -d
+make build
+cd web && npm install && npm run build
+cd ..
+./bin/cryptojackal
 ```
 
-The app is available at `http://localhost:8080`.
+Open `http://localhost:8080`.
 
 ## First Time Setup
 
 **Paper Trading** works out of the box. No setup needed.
+
+1. Log in with password from `.env` (or default `admin`)
+2. Go to **Setup** and verify Paper Trading mode is enabled
+3. Click **Start Bot** on the Dashboard
+4. The bot will discover tokens and auto-trade in paper mode
 
 **Live Trading** requires configuration:
 
@@ -57,12 +67,11 @@ The app is available at `http://localhost:8080`.
 
 | Page | What It Does |
 |------|-------------|
-| **Dashboard** | See your balance, profit/loss, total trades, win rate. Start and stop the bot. |
+| **Dashboard** | Balance, P&L, total trades, win rate. Start/stop bot. API health indicators. |
 | **Tokens** | Browse trending and new tokens. Search by name or symbol. Click a token to buy it. |
-| **Portfolio** | See your current holdings, average buy price, and current value. Sell tokens here. |
-| **History** | View all your past trades with timestamps and profit/loss per trade. |
-| **Setup** | Configure trading mode, API keys, trade size, and stop loss percentage. |
-| **Help** | Explanation of all features and settings. |
+| **Portfolio** | Current holdings, average buy price, current value. Sell tokens here. |
+| **History** | All past trades with timestamps and profit/loss per trade. |
+| **Setup** | Trading mode, API keys, trade size, stop loss, scan interval. |
 
 ## Key Settings
 
@@ -73,14 +82,19 @@ The app is available at `http://localhost:8080`.
 | `TRADE_AMOUNT` | How much to spend per trade | `100` |
 | `STOP_LOSS` | Auto-sell if price drops this percentage | `5` |
 | `MAX_SLIPPAGE` | Maximum price difference allowed during trade | `0.5` |
+| `SCAN_INTERVAL` | How often to scan for opportunities | `60s` |
 | `ETH_NODE_URL` | Your Ethereum RPC endpoint | empty |
 | `PRIVATE_KEY` | Your wallet private key (live only) | empty |
+| `ADMIN_PASSWORD` | Dashboard login password | `admin` |
+| `JWT_SECRET` | Secret for session tokens | `change-me-in-production` |
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/health` | GET | Check if the server is running |
+| `/api/health/external` | GET | Check CoinGecko/DexScreener connectivity |
+| `/api/auth/login` | POST | Log in and get JWT token |
 | `/api/config` | GET | View current configuration |
 | `/api/config` | POST | Update configuration |
 | `/api/bot/status` | GET | Check if bot is running |
@@ -100,18 +114,34 @@ The app is available at `http://localhost:8080`.
 ## Development
 
 ```bash
+# Run backend + frontend in parallel (dev mode)
+make dev
+
 # Run tests
 go test ./internal/...
 
-# Run the bot
-go run ./cmd/cryptojackal
-
-# Run the web dashboard
-cd web && npm run dev
-
-# Build for production
+# Build production binary
 make build
-cd web && npm run build
+
+# Run with Docker
+make docker-up
+
+# Stop Docker
+make docker-down
+
+# View logs
+make logs
+```
+
+## Systemd Service (Linux)
+
+To run on boot, copy the included service file:
+
+```bash
+sudo cp cryptojackal.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable cryptojackal
+sudo systemctl start cryptojackal
 ```
 
 ## License

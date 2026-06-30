@@ -1,0 +1,18 @@
+[Unit]
+Description=CryptoJackal Trading Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%I
+WorkingDirectory=/opt/cryptojackal
+ExecStart=/opt/cryptojackal/cryptojackal
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cryptojackal
+
+[Install]
+WantedBy=multi-user.target
