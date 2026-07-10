@@ -146,6 +146,38 @@ func (s *Storage) GetTradesByType(tradeType models.TradeType, limit int) ([]mode
 	return scanTrades(rows)
 }
 
+// GetTradesFiltered retrieves trades with optional filtering
+func (s *Storage) GetTradesFiltered(tradeType string, status string, limit int, offset int) ([]models.Trade, error) {
+	query := `SELECT id, token_address, token_symbol, type, amount_in, amount_out, price, profit_loss, status, is_paper_trade, executed_at FROM trades WHERE 1=1`
+	args := []interface{}{}
+
+	if tradeType != "" {
+		query += ` AND type = ?`
+		args = append(args, tradeType)
+	}
+	if status != "" {
+		query += ` AND status = ?`
+		args = append(args, status)
+	}
+	query += ` ORDER BY executed_at DESC`
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	if offset > 0 {
+		query += ` OFFSET ?`
+		args = append(args, offset)
+	}
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanTrades(rows)
+}
+
 func scanTrades(rows *sql.Rows) ([]models.Trade, error) {
 	var trades []models.Trade
 	for rows.Next() {

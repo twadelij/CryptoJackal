@@ -20,6 +20,12 @@ type Service struct {
 	initialBalance float64
 	logger         *zap.Logger
 	storage        *storage.Storage
+	discovery      DiscoveryProvider
+}
+
+// DiscoveryProvider provides current token prices for portfolio valuation
+type DiscoveryProvider interface {
+	GetTrendingTokens(ctx context.Context) ([]models.Token, error)
 }
 
 // NewService creates a new paper trading service
@@ -106,6 +112,13 @@ func (s *Service) loadAllPortfolios() ([]*models.Portfolio, error) {
 	return nil, nil
 }
 
+// SetDiscoveryService injects the discovery service for real-time price lookups
+func (s *Service) SetDiscoveryService(d DiscoveryProvider) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.discovery = d
+}
+
 // GetPortfolio returns the current portfolio
 func (s *Service) GetPortfolio() *models.Portfolio {
 	s.mu.RLock()
@@ -122,6 +135,42 @@ func (s *Service) GetPortfolio() *models.Portfolio {
 	if s.initialBalance > 0 {
 		s.portfolio.ProfitLossPct = (s.portfolio.ProfitLoss / s.initialBalance) * 100
 	}
+
+	return s.portfolio
+}
+
+// GetPortfolioRealTime returns portfolio with current market prices
+func (s *Service) GetPortfolioRealTime(ctx context.Context) *models.Portfolio {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.discovery != nil {
+		if tokens, err := s.discovery.GetTrendingTokens(ctx); err == nil {
+			priceMap := make(map[string]float64)
+			for _, t := range tokens {
+				priceMap[t.Address] = t.Price
+			}
+			for addr, bal := range s.portfolio.TokenBalances {
+				if price, ok := priceMap[addr]; ok {
+					bal.Value = bal.Balance * price
+					bal.Token.Price = price
+					s.portfolio.TokenBalances[addr] = bal
+				}
+			}
+		}
+	}
+
+	total := s.portfolio.Balance
+	for _, balance := range s.portfolio.TokenBalances {
+		total += balance.Value
+	}
+	s.portfolio.TotalValue = total
+	s.portfolio.ETHBalance = s.portfolio.Balance
+	s.portfolio.ProfitLoss = total - s.initialBalance
+	if s.initialBalance > 0 {
+		s.portfolio.ProfitLossPct = (s.portfolio.ProfitLoss / s.initialBalance) * 100
+	}
+	s.portfolio.UpdatedAt = time.Now()
 
 	return s.portfolio
 }
@@ -240,6 +289,42 @@ func (s *Service) GetTradeHistory(limit int) []models.Trade {
 		result[i] = s.trades[len(s.trades)-1-i]
 	}
 	return result
+}
+
+// GetFilteredTrades returns trades filtered by type, status, with pagination
+func (s *Service) GetFilteredTrades(tradeType string, status string, limit int, offset int) ([]models.Trade, error) {
+	if s.storage != nil {
+		return s.storage.GetTradesFiltered(tradeType, status, limit, offset)
+	}
+	// Fallback: filter in memory
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var filtered []models.Trade
+	for _, t := range s.trades {
+		if tradeType != "" && string(t.Type) != tradeType {
+			continue
+		}
+		if status != "" && string(t.Status) != status {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+
+	// Reverse (newest first) and paginate
+	total := len(filtered)
+	if offset >= total {
+		return []models.Trade{}, nil
+	}
+	end := offset + limit
+	if end > total || limit == 0 {
+		end = total
+	}
+	result := make([]models.Trade, 0, end-offset)
+	for i := total - 1 - offset; i >= total-end && i >= 0; i-- {
+		result = append(result, filtered[i])
+	}
+	return result, nil
 }
 
 // GetMetrics returns trading metrics

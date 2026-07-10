@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -120,9 +121,51 @@ func (h *Handler) ExecuteTrade(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{Success: true, Data: trade})
 }
 
-// GetTradingHistory returns trading history
+// GetTradingHistory returns trading history with optional filtering
 func (h *Handler) GetTradingHistory(c *gin.Context) {
-	trades := h.paper.GetTradeHistory(50)
+	tradeType := c.Query("type")
+	status := c.Query("status")
+	limit := 50
+	if l, err := strconv.Atoi(c.Query("limit")); err == nil && l > 0 && l <= 1000 {
+		limit = l
+	}
+	offset := 0
+	if o, err := strconv.Atoi(c.Query("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+
+	trades, err := h.paper.GetFilteredTrades(tradeType, status, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, Response{Success: true, Data: trades})
+}
+
+// ExportPaperTrades exports paper trades as JSON or CSV
+func (h *Handler) ExportPaperTrades(c *gin.Context) {
+	format := c.Query("format")
+	if format != "csv" {
+		format = "json"
+	}
+
+	trades, err := h.paper.GetFilteredTrades("", "", 0, 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	if format == "csv" {
+		c.Header("Content-Type", "text/csv")
+		c.Header("Content-Disposition", "attachment; filename=trades.csv")
+		c.String(http.StatusOK, "ID,Symbol,Type,Amount,Price,ProfitLoss,Status,ExecutedAt\n")
+		for _, t := range trades {
+			c.String(http.StatusOK, "%s,%s,%s,%.6f,%.6f,%.6f,%s,%s\n",
+				t.ID, t.TokenSymbol, t.Type, t.AmountIn, t.Price, t.ProfitLoss, t.Status, t.ExecutedAt.Format(time.RFC3339))
+		}
+		return
+	}
+
 	c.JSON(http.StatusOK, Response{Success: true, Data: trades})
 }
 
@@ -179,9 +222,9 @@ func (h *Handler) AnalyzeToken(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{Success: true, Data: token})
 }
 
-// GetPaperBalance returns paper trading balance
+// GetPaperBalance returns paper trading balance with real-time prices
 func (h *Handler) GetPaperBalance(c *gin.Context) {
-	portfolio := h.paper.GetPortfolio()
+	portfolio := h.paper.GetPortfolioRealTime(c.Request.Context())
 	c.JSON(http.StatusOK, Response{Success: true, Data: portfolio})
 }
 

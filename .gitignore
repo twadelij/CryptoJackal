@@ -45,3 +45,8 @@ web/dist/
 # Build artifacts
 build/
 dist/
+
+# Development docs (local planning, not for git)
+docs/DEVELOPMENT_GUIDE.md
+Sprint-Status.md
+

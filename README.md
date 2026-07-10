@@ -106,9 +106,11 @@ Open `http://localhost:8080`.
 | `/api/discovery/trending` | GET | Get trending tokens |
 | `/api/discovery/new` | GET | Get newly listed tokens |
 | `/api/discovery/analyze/:address` | GET | Analyze a specific token |
-| `/api/paper/balance` | GET | Get paper trading balance |
+| `/api/paper/balance` | GET | Get paper trading balance (real-time prices) |
 | `/api/paper/reset` | POST | Reset paper trading to starting balance |
 | `/api/paper/trade` | POST | Execute a paper trade |
+| `/api/paper/history` | GET | Get paper trade history (filter: `?type=buy&status=executed&limit=50`) |
+| `/api/paper/export` | GET | Export trades as JSON or CSV (`?format=csv`) |
 | `/api/metrics` | GET | Get trading statistics |
 
 ## Development

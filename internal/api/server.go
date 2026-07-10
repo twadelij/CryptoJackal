@@ -91,6 +91,7 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 			protected.POST("/paper/reset", handler.ResetPaperBalance)
 			protected.POST("/paper/trade", handler.ExecutePaperTrade)
 			protected.GET("/paper/history", handler.GetTradingHistory)
+			protected.GET("/paper/export", handler.ExportPaperTrades)
 
 			// Metrics
 			protected.GET("/metrics", handler.GetMetrics)
