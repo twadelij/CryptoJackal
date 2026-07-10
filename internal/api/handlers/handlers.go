@@ -84,8 +84,8 @@ func (h *Handler) GetOpportunities(c *gin.Context) {
 
 // ExecuteTradeRequest is the request body for executing a trade
 type ExecuteTradeRequest struct {
-	OpportunityID string  `json:"opportunity_id"`
-	Amount        float64 `json:"amount"`
+	OpportunityID string  `json:"opportunity_id" binding:"required"`
+	Amount        float64 `json:"amount" binding:"required,gt=0"`
 }
 
 // ExecuteTrade executes a trade
@@ -139,6 +139,12 @@ func (h *Handler) GetTrendingTokens(c *gin.Context) {
 // GetNewTokens returns newly discovered tokens
 func (h *Handler) GetNewTokens(c *gin.Context) {
 	chain := c.DefaultQuery("chain", "ethereum")
+	// Validate chain parameter to prevent injection
+	validChains := map[string]bool{"ethereum": true, "bsc": true, "polygon": true, "arbitrum": true, "base": true}
+	if !validChains[chain] {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "invalid chain parameter"})
+		return
+	}
 	tokens, err := h.discovery.GetNewTokens(c.Request.Context(), chain)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: err.Error()})
@@ -152,6 +158,11 @@ func (h *Handler) AnalyzeToken(c *gin.Context) {
 	address := c.Param("address")
 	if address == "" {
 		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "address required"})
+		return
+	}
+	// Basic Ethereum address validation (0x + 40 hex chars)
+	if len(address) != 42 || address[:2] != "0x" {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "invalid Ethereum address format"})
 		return
 	}
 
@@ -185,9 +196,9 @@ type PaperTradeRequest struct {
 	TokenAddress string  `json:"token_address" binding:"required"`
 	TokenSymbol  string  `json:"token_symbol" binding:"required"`
 	TokenName    string  `json:"token_name"`
-	Price        float64 `json:"price" binding:"required"`
-	Amount       float64 `json:"amount" binding:"required"`
-	Type         string  `json:"type" binding:"required"` // "buy" or "sell"
+	Price        float64 `json:"price" binding:"required,gt=0"`
+	Amount       float64 `json:"amount" binding:"required,gt=0"`
+	Type         string  `json:"type" binding:"required,oneof=buy sell"` // "buy" or "sell"
 }
 
 // ExecutePaperTrade executes a paper trade

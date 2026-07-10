@@ -39,8 +39,14 @@ func main() {
 	}
 
 	// Initialize SQLite storage
-	dataDir := filepath.Join(os.Getenv("HOME"), ".cryptojackal")
-	os.MkdirAll(dataDir, 0755)
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Fatal("failed to get home directory", zap.Error(err))
+	}
+	dataDir := filepath.Join(homeDir, ".cryptojackal")
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
+		logger.Fatal("failed to create data directory", zap.Error(err))
+	}
 	store, err := storage.New(filepath.Join(dataDir, "cryptojackal.db"))
 	if err != nil {
 		logger.Fatal("failed to initialize storage", zap.Error(err))
@@ -93,7 +99,9 @@ func main() {
 		}
 
 		engine.Stop()
-		server.Shutdown(context.Background())
+		if err := server.Shutdown(context.Background()); err != nil {
+			logger.Warn("server shutdown error", zap.Error(err))
+		}
 	}()
 
 	// Start the server

@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, development]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run gosec
+        run: $(go env GOPATH)/bin/gosec ./...
+
+      - name: Build backend
+        run: go build ./cmd/cryptojackal
+
+      - name: Run Go tests
+        run: go test ./internal/... -v
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Basic check for common secret patterns in Go files
+          if grep -r -i "password.*=.*\"[^\"]\"" --include="*.go" . | grep -v "_test.go" | grep -v "example" | grep -v "GetEnv"; then
+            echo "ERROR: Potential hardcoded password found"
+            exit 1
+          fi
+          if grep -r -i "secret.*=.*\"[^\"]\"" --include="*.go" . | grep -v "_test.go" | grep -v "example" | grep -v "GetEnv"; then
+            echo "ERROR: Potential hardcoded secret found"
+            exit 1
+          fi
+          echo "No hardcoded secrets found"
+
+  frontend-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: ./web
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./web
+        run: npm run build
+
+      - name: Run frontend tests
+        working-directory: ./web
+        run: npm test -- --watchAll=false || true

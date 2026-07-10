@@ -114,13 +114,16 @@ func (s *Storage) SaveTrade(trade *models.Trade) error {
 
 // GetTrades retrieves all trades ordered by execution time (newest first)
 func (s *Storage) GetTrades(limit int) ([]models.Trade, error) {
-	query := `SELECT id, token_address, token_symbol, type, amount_in, amount_out, price, profit_loss, status, is_paper_trade, executed_at
-		FROM trades ORDER BY executed_at DESC`
-	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
-	}
+	var rows *sql.Rows
+	var err error
 
-	rows, err := s.db.Query(query)
+	if limit > 0 {
+		rows, err = s.db.Query(`SELECT id, token_address, token_symbol, type, amount_in, amount_out, price, profit_loss, status, is_paper_trade, executed_at
+			FROM trades ORDER BY executed_at DESC LIMIT ?`, limit)
+	} else {
+		rows, err = s.db.Query(`SELECT id, token_address, token_symbol, type, amount_in, amount_out, price, profit_loss, status, is_paper_trade, executed_at
+			FROM trades ORDER BY executed_at DESC`)
+	}
 	if err != nil {
 		return nil, err
 	}

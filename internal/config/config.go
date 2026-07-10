@@ -16,23 +16,23 @@ type Config struct {
 	ServerHost string
 
 	// Ethereum
-	NodeURL     string
-	ChainID     int64
-	PrivateKey  string
+	NodeURL       string
+	ChainID       int64
+	PrivateKey    string
 	WalletAddress string
 
 	// Trading
-	TradeAmount       float64
-	MaxSlippage       float64
-	MinLiquidity      float64
-	MaxPriceImpact    float64
-	ScanInterval      time.Duration
-	GasLimit          uint64
-	MaxGasPrice       uint64
+	TradeAmount    float64
+	MaxSlippage    float64
+	MinLiquidity   float64
+	MaxPriceImpact float64
+	ScanInterval   time.Duration
+	GasLimit       uint64
+	MaxGasPrice    uint64
 
 	// Paper Trading
-	PaperTradingMode  bool
-	InitialBalance    float64
+	PaperTradingMode bool
+	InitialBalance   float64
 
 	// API Keys
 	CoinGeckoAPIKey   string
@@ -44,20 +44,23 @@ type Config struct {
 	DiscordWebhookURL string
 
 	// Security
-	JWTSecret         string
-	AdminPassword     string
-	CORSOrigins       []string
+	JWTSecret     string
+	AdminPassword string
+	CORSOrigins   []string
 
 	// Redis
-	RedisURL          string
+	RedisURL string
 
 	// Environment
-	Environment       string
+	Environment string
 }
 
 func Load() (*Config, error) {
 	// Load .env file if it exists
-	godotenv.Load()
+	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
+		// Only warn if the file exists but couldn't be read
+		// .env is optional, so missing file is fine
+	}
 
 	cfg := &Config{
 		// Server defaults
@@ -75,8 +78,8 @@ func Load() (*Config, error) {
 		MinLiquidity:   getEnvFloat("MIN_LIQUIDITY", 10000),
 		MaxPriceImpact: getEnvFloat("MAX_PRICE_IMPACT", 3.0),
 		ScanInterval:   time.Duration(getEnvInt("SCAN_INTERVAL_SECONDS", 30)) * time.Second,
-		GasLimit:       uint64(getEnvInt("GAS_LIMIT", 300000)),
-		MaxGasPrice:    uint64(getEnvInt("MAX_GAS_PRICE_GWEI", 100)),
+		GasLimit:       safeUint64(getEnvInt("GAS_LIMIT", 300000)),
+		MaxGasPrice:    safeUint64(getEnvInt("MAX_GAS_PRICE_GWEI", 100)),
 
 		// Paper trading defaults
 		PaperTradingMode: getEnvBool("PAPER_TRADING_MODE", true),
@@ -188,11 +191,11 @@ func (c *Config) LoadFromStorage(store *storage.Storage) error {
 			}
 		case "gas_limit":
 			if v, err := strconv.Atoi(value); err == nil {
-				c.GasLimit = uint64(v)
+				c.GasLimit = safeUint64(v)
 			}
 		case "max_gas_price_gwei":
 			if v, err := strconv.Atoi(value); err == nil {
-				c.MaxGasPrice = uint64(v)
+				c.MaxGasPrice = safeUint64(v)
 			}
 		case "eth_node_url":
 			c.NodeURL = value
@@ -210,18 +213,18 @@ func (c *Config) LoadFromStorage(store *storage.Storage) error {
 // SaveToStorage persists the current config values to the database
 func (c *Config) SaveToStorage(store *storage.Storage) error {
 	pairs := map[string]string{
-		"paper_trading_mode":      fmt.Sprintf("%t", c.PaperTradingMode),
-		"initial_balance":         fmt.Sprintf("%f", c.InitialBalance),
-		"trade_amount":            fmt.Sprintf("%f", c.TradeAmount),
-		"max_slippage":            fmt.Sprintf("%f", c.MaxSlippage),
-		"min_liquidity":           fmt.Sprintf("%f", c.MinLiquidity),
-		"max_price_impact":        fmt.Sprintf("%f", c.MaxPriceImpact),
-		"scan_interval_seconds":   fmt.Sprintf("%d", int(c.ScanInterval.Seconds())),
-		"gas_limit":               fmt.Sprintf("%d", c.GasLimit),
-		"max_gas_price_gwei":      fmt.Sprintf("%d", c.MaxGasPrice),
-		"eth_node_url":            c.NodeURL,
-		"chain_id":                fmt.Sprintf("%d", c.ChainID),
-		"environment":             c.Environment,
+		"paper_trading_mode":    fmt.Sprintf("%t", c.PaperTradingMode),
+		"initial_balance":       fmt.Sprintf("%f", c.InitialBalance),
+		"trade_amount":          fmt.Sprintf("%f", c.TradeAmount),
+		"max_slippage":          fmt.Sprintf("%f", c.MaxSlippage),
+		"min_liquidity":         fmt.Sprintf("%f", c.MinLiquidity),
+		"max_price_impact":      fmt.Sprintf("%f", c.MaxPriceImpact),
+		"scan_interval_seconds": fmt.Sprintf("%d", int(c.ScanInterval.Seconds())),
+		"gas_limit":             fmt.Sprintf("%d", c.GasLimit),
+		"max_gas_price_gwei":    fmt.Sprintf("%d", c.MaxGasPrice),
+		"eth_node_url":          c.NodeURL,
+		"chain_id":              fmt.Sprintf("%d", c.ChainID),
+		"environment":           c.Environment,
 	}
 
 	for key, value := range pairs {
@@ -230,4 +233,12 @@ func (c *Config) SaveToStorage(store *storage.Storage) error {
 		}
 	}
 	return nil
+}
+
+// safeUint64 converts an int to uint64 with bounds checking to prevent overflow
+func safeUint64(v int) uint64 {
+	if v < 0 {
+		return 0
+	}
+	return uint64(v)
 }

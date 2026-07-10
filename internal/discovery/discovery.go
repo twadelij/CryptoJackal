@@ -2,8 +2,9 @@ package discovery
 
 import (
 	"context"
+	"crypto/rand"
 	"math"
-	"math/rand"
+	"math/big"
 	"sync"
 	"time"
 
@@ -13,19 +14,18 @@ import (
 
 // Service manages token discovery from multiple sources
 type Service struct {
-	coingecko    *CoinGeckoClient
-	dexscreener  *DexScreenerClient
-	logger       *zap.Logger
-	
+	coingecko   *CoinGeckoClient
+	dexscreener *DexScreenerClient
+	logger      *zap.Logger
+
 	// Cache
-	mu           sync.RWMutex
+	mu            sync.RWMutex
 	trendingCache []models.Token
-	cacheTime    time.Time
-	cacheTTL     time.Duration
-	
+	cacheTime     time.Time
+	cacheTTL      time.Duration
+
 	// Demo state for fallback tokens
-	demoTokens   []models.Token
-	demoSeed     int64
+	demoTokens []models.Token
 }
 
 // HealthStatus represents the health of external APIs
@@ -41,7 +41,6 @@ func NewService(coingeckoAPIKey string, logger *zap.Logger) *Service {
 		dexscreener: NewDexScreenerClient(logger),
 		logger:      logger,
 		cacheTTL:    5 * time.Minute,
-		demoSeed:    time.Now().Unix(),
 	}
 	s.demoTokens = s.initialDemoTokens()
 	return s
@@ -174,8 +173,8 @@ func (s *Service) FindOpportunities(ctx context.Context, chain string, minLiquid
 
 			opp := models.NewOpportunity(
 				token,
-				token.PriceChange24h * 0.1, // Expected 10% of current momentum
-				0.01, // 1% price impact estimate
+				token.PriceChange24h*0.1, // Expected 10% of current momentum
+				0.01,                     // 1% price impact estimate
 				confidence,
 				"momentum",
 			)
@@ -194,18 +193,25 @@ func (s *Service) fallbackTokens() []models.Token {
 	defer s.mu.Unlock()
 
 	// Update prices with small random variation (-5% to +5%)
-	s.demoSeed++
-	r := rand.New(rand.NewSource(s.demoSeed))
 	for i := range s.demoTokens {
-		variation := 1.0 + (r.Float64()*0.1 - 0.05) // +/- 5%
+		variation := 1.0 + (cryptoFloat64()*0.1 - 0.05) // +/- 5%
 		s.demoTokens[i].Price = math.Max(0.000001, s.demoTokens[i].Price*variation)
-		s.demoTokens[i].PriceChange24h = s.demoTokens[i].PriceChange24h + (r.Float64()*4 - 2)
-		s.demoTokens[i].Volume24h = math.Max(1000, s.demoTokens[i].Volume24h*(1.0+(r.Float64()*0.06-0.03)))
+		s.demoTokens[i].PriceChange24h = s.demoTokens[i].PriceChange24h + (cryptoFloat64()*4 - 2)
+		s.demoTokens[i].Volume24h = math.Max(1000, s.demoTokens[i].Volume24h*(1.0+(cryptoFloat64()*0.06-0.03)))
 	}
 
 	result := make([]models.Token, len(s.demoTokens))
 	copy(result, s.demoTokens)
 	return result
+}
+
+// cryptoFloat64 returns a random float64 in [0.0, 1.0) using crypto/rand
+func cryptoFloat64() float64 {
+	n, err := rand.Int(rand.Reader, big.NewInt(1<<53))
+	if err != nil {
+		return 0.5 // fallback on error
+	}
+	return float64(n.Int64()) / (1 << 53)
 }
 
 // initialDemoTokens creates the base set of demo tokens

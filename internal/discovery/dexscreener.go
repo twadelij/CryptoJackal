@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,7 +178,9 @@ func (d *DexScreenerClient) GetBoostedTokens(ctx context.Context) ([]models.Toke
 		// Use the first pair for token info
 		pair := pairs[0]
 		var price float64
-		fmt.Sscanf(pair.PriceUSD, "%f", &price)
+		if p, err := strconv.ParseFloat(pair.PriceUSD, 64); err == nil {
+			price = p
+		}
 
 		tokens = append(tokens, models.Token{
 			Address:        pair.BaseToken.Address,
@@ -220,7 +223,9 @@ func (d *DexScreenerClient) SearchToken(ctx context.Context, address string) ([]
 		seen[pair.BaseToken.Address] = true
 
 		var price float64
-		fmt.Sscanf(pair.PriceUSD, "%f", &price)
+		if p, err := strconv.ParseFloat(pair.PriceUSD, 64); err == nil {
+			price = p
+		}
 
 		tokens = append(tokens, models.Token{
 			Address:        pair.BaseToken.Address,
