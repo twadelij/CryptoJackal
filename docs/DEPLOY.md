@@ -1,5 +1,11 @@
 # CryptoJackal Server Deploy Guide
 
+## Requirements
+
+- Docker + docker-compose-plugin
+- make (optioneel, zie alternatief hieronder)
+- Go 1.24+ (alleen voor local run zonder Docker)
+
 ## Snelle start (op je home server)
 
 ```bash
@@ -9,19 +15,20 @@ ssh twadelij@192.168.2.252
 # 2. Maak testapp dir
 mkdir -p /home/twadelij/testapp
 cd /home/twadelij/testapp
-
-# 3. Clone repo
 git clone https://github.com/twadelij/CryptoJackal.git
 cd CryptoJackal
 
-# 4. Kopieer env en pas aan
+# 3. Kopieer env en pas aan
 cp .env.example .env
 # Edit .env: wijzig ADMIN_PASSWORD en JWT_SECRET
 
-# 5. Start met Docker
+# 4. Start met Docker (met make)
 make docker-up
 
-# 6. Check health
+# ALTERNATIEF: zonder make
+docker compose up -d --build
+
+# 5. Check health
 curl http://localhost:8080/api/health
 ```
 

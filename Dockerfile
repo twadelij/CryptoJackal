@@ -1,7 +1,10 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
+
+# Enable automatic toolchain download for newer Go versions
+ENV GOTOOLCHAIN=auto
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates nodejs npm

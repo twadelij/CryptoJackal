@@ -1,5 +1,9 @@
 # Server Setup: 192.168.2.252
 
+## Requirements
+- Docker + docker-compose-plugin
+- make (optioneel, alternatief: `docker compose up -d --build`)
+
 ## Wat dit doet
 
 Op jouw home server (192.168.2.252) wordt een `testapp` dir aangemaakt in `/home/twadelij` met:
@@ -30,8 +34,10 @@ fi
 # 4. Kopieer env file
 cp .env.example .env
 
-# 5. Bouw en start
+# 5. Bouw en start (met make, of zonder)
 make docker-up
+# ALTERNATIEF als make niet geinstalleerd is:
+# docker compose up -d --build
 
 # 6. Check of het draait
 echo "Wacht 10 seconden..."
