@@ -101,16 +101,20 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 		}
 	}
 
-	// Serve embedded frontend (fallback when web/dist is not built)
-	router.GET("/", func(c *gin.Context) {
-		data, _ := indexHTML.ReadFile("templates/index.html")
-		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
-	})
-
-	// Serve static frontend files if web/dist exists (production build)
+	// Serve built React frontend if web/dist exists, otherwise fallback to embedded template
 	if _, err := os.Stat("web/dist"); err == nil {
 		router.Static("/assets", "web/dist/assets")
 		router.StaticFile("/favicon.ico", "web/dist/favicon.ico")
+		router.StaticFile("/index.html", "web/dist/index.html")
+		router.GET("/", func(c *gin.Context) {
+			c.File("web/dist/index.html")
+		})
+	} else {
+		// Fallback: serve embedded template
+		router.GET("/", func(c *gin.Context) {
+			data, _ := indexHTML.ReadFile("templates/index.html")
+			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+		})
 	}
 
 	router.NoRoute(func(c *gin.Context) {
@@ -119,9 +123,13 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "not found"})
 			return
 		}
-		// All other 404s serve the frontend (SPA routing)
-		data, _ := indexHTML.ReadFile("templates/index.html")
-		c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+		// All other 404s serve the React frontend (SPA routing)
+		if _, err := os.Stat("web/dist/index.html"); err == nil {
+			c.File("web/dist/index.html")
+		} else {
+			data, _ := indexHTML.ReadFile("templates/index.html")
+			c.Data(http.StatusOK, "text/html; charset=utf-8", data)
+		}
 	})
 
 	return &Server{
