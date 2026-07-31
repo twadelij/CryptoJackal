@@ -98,6 +98,8 @@ type BotStatus struct {
 	TotalProfitLoss     float64    `json:"total_profit_loss"`
 	CurrentBalance      float64    `json:"current_balance"`
 	ActiveOpportunities int        `json:"active_opportunities"`
+	KillSwitchTriggered bool       `json:"kill_switch_triggered,omitempty"`
+	DailyLoss           float64    `json:"daily_loss,omitempty"`
 }
 
 // Metrics for monitoring

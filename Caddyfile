@@ -1,0 +1,14 @@
+{
+	auto_https off
+}
+
+:8080 {
+	root * /usr/share/caddy
+	file_server
+
+	reverse_proxy /api/* localhost:8080
+	reverse_proxy /assets/* localhost:8080
+
+	# Health check endpoint
+	respond /health "OK" 200
+}

@@ -90,7 +90,93 @@ func NewServiceWithStorage(initialBalance float64, logger *zap.Logger, store *st
 		s.trades = make([]models.Trade, 0)
 	}
 
+	// Demo mode: populate with fictitious trades if empty
+	if len(s.trades) == 0 {
+		s.populateDemoTrades()
+	}
+
 	return s
+}
+
+// populateDemoTrades creates sample trades for new users to see the app in action
+func (s *Service) populateDemoTrades() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	demoTokens := []models.Token{
+		{Address: "0xDOJI1234567890abcdef", Symbol: "DOJI", Name: "DOJI/Degen", Price: 0.000004},
+		{Address: "0xFLOKI1234567890abcdef", Symbol: "FLOKI", Name: "FLOKI/USD", Price: 0.000042},
+		{Address: "0xPEPE1234567890abcdef", Symbol: "PEPE", Name: "PEPE/ETH", Price: 0.000001},
+	}
+
+	now := time.Now()
+	// Buy DOJI at lower price (will show profit)
+	buy1 := models.NewTrade(demoTokens[0].Address, demoTokens[0].Symbol, models.TradeTypeBuy, 1000000, 0.000003, true)
+	buy1.Status = models.TradeStatusExecuted
+	buy1.AmountOut = 1000000
+	buy1.ExecutedAt = now.Add(-2 * time.Hour)
+	s.trades = append(s.trades, *buy1)
+	s.portfolio.TokenBalances[demoTokens[0].Address] = models.TokenBalance{
+		Token:    demoTokens[0],
+		Balance:  1000000,
+		Value:    1000000 * demoTokens[0].Price,
+		AvgPrice: 0.000003,
+	}
+	s.portfolio.Balance -= 1000000 * 0.000003
+
+	// Buy FLOKI (will show loss)
+	buy2 := models.NewTrade(demoTokens[1].Address, demoTokens[1].Symbol, models.TradeTypeBuy, 5000, 0.000050, true)
+	buy2.Status = models.TradeStatusExecuted
+	buy2.AmountOut = 5000
+	buy2.ExecutedAt = now.Add(-1 * time.Hour)
+	s.trades = append(s.trades, *buy2)
+	s.portfolio.TokenBalances[demoTokens[1].Address] = models.TokenBalance{
+		Token:    demoTokens[1],
+		Balance:  5000,
+		Value:    5000 * demoTokens[1].Price,
+		AvgPrice: 0.000050,
+	}
+	s.portfolio.Balance -= 5000 * 0.000050
+
+	// Sell PEPE (small profit)
+	buy3 := models.NewTrade(demoTokens[2].Address, demoTokens[2].Symbol, models.TradeTypeBuy, 2000000, 0.0000008, true)
+	buy3.Status = models.TradeStatusExecuted
+	buy3.AmountOut = 2000000
+	buy3.ExecutedAt = now.Add(-3 * time.Hour)
+	s.trades = append(s.trades, *buy3)
+
+	sell3 := models.NewTrade(demoTokens[2].Address, demoTokens[2].Symbol, models.TradeTypeSell, 2000000, 0.000001, true)
+	sell3.Status = models.TradeStatusExecuted
+	sell3.AmountOut = 2000000 * 0.000001
+	sell3.ProfitLoss = 2000000 * (0.000001 - 0.0000008)
+	sell3.ExecutedAt = now.Add(-30 * time.Minute)
+	s.trades = append(s.trades, *sell3)
+	s.portfolio.Balance += sell3.AmountOut
+
+	// Recalculate total value
+	total := s.portfolio.Balance
+	for _, bal := range s.portfolio.TokenBalances {
+		total += bal.Value
+	}
+	s.portfolio.TotalValue = total
+	s.portfolio.ProfitLoss = total - s.initialBalance
+	if s.initialBalance > 0 {
+		s.portfolio.ProfitLossPct = (s.portfolio.ProfitLoss / s.initialBalance) * 100
+	}
+
+	// Persist demo trades
+	if s.storage != nil {
+		for i := range s.trades {
+			if err := s.storage.SaveTrade(&s.trades[i]); err != nil {
+				s.logger.Warn("failed to save demo trade", zap.Error(err))
+			}
+		}
+		if err := s.storage.SavePortfolio(s.portfolio, s.initialBalance); err != nil {
+			s.logger.Warn("failed to save demo portfolio", zap.Error(err))
+		}
+	}
+
+	s.logger.Info("demo trades populated", zap.Int("count", len(s.trades)))
 }
 
 // loadAllPortfolios loads all portfolios from storage (helper for startup)

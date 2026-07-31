@@ -32,6 +32,15 @@ func New(dbPath string) (*Storage, error) {
 	}
 
 	s := &Storage{db: db, dbPath: dbPath}
+
+	// Enable WAL mode for better crash recovery and concurrent access
+	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		return nil, fmt.Errorf("failed to enable WAL mode: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA synchronous=NORMAL"); err != nil {
+		return nil, fmt.Errorf("failed to set synchronous mode: %w", err)
+	}
+
 	if err := s.migrate(); err != nil {
 		return nil, fmt.Errorf("failed to migrate: %w", err)
 	}

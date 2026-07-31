@@ -34,6 +34,13 @@ type Config struct {
 	PaperTradingMode bool
 	InitialBalance   float64
 
+	// Safety Rails (Live Trading)
+	MaxDailyLossPct   float64
+	MaxTradeSizePct   float64
+	TradeCooldown     time.Duration
+	MaxOpenPositions  int
+	KillSwitchEnabled bool
+
 	// API Keys
 	CoinGeckoAPIKey   string
 	DexScreenerAPIKey string
@@ -84,6 +91,13 @@ func Load() (*Config, error) {
 		// Paper trading defaults
 		PaperTradingMode: getEnvBool("PAPER_TRADING_MODE", true),
 		InitialBalance:   getEnvFloat("INITIAL_BALANCE", 10.0),
+
+		// Safety rails defaults (conservative)
+		MaxDailyLossPct:   getEnvFloat("MAX_DAILY_LOSS_PCT", 5.0),
+		MaxTradeSizePct:   getEnvFloat("MAX_TRADE_SIZE_PCT", 1.0),
+		TradeCooldown:     time.Duration(getEnvInt("TRADE_COOLDOWN_MINUTES", 5)) * time.Minute,
+		MaxOpenPositions:  getEnvInt("MAX_OPEN_POSITIONS", 3),
+		KillSwitchEnabled: getEnvBool("KILL_SWITCH_ENABLED", true),
 
 		// API Keys
 		CoinGeckoAPIKey:   getEnv("COINGECKO_API_KEY", ""),

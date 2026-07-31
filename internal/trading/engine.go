@@ -2,6 +2,7 @@ package trading
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,22 +16,28 @@ import (
 
 // Engine is the main trading engine
 type Engine struct {
-	config       *config.Config
-	wallet       *wallet.Wallet
-	discovery    *discovery.Service
-	paper        *paper.Service
-	logger       *zap.Logger
+	config    *config.Config
+	wallet    *wallet.Wallet
+	discovery *discovery.Service
+	paper     *paper.Service
+	logger    *zap.Logger
 
-	mu           sync.RWMutex
-	isRunning    bool
-	startedAt    *time.Time
-	stopChan     chan struct{}
-	
+	mu        sync.RWMutex
+	isRunning bool
+	startedAt *time.Time
+	stopChan  chan struct{}
+
 	// Stats
 	totalTrades      int
 	profitableTrades int
 	totalProfitLoss  float64
 	opportunities    []models.TradingOpportunity
+
+	// Safety rails
+	lastTradeTime       time.Time
+	dailyStartValue     float64
+	dailyLoss           float64
+	killSwitchTriggered bool
 }
 
 // NewEngine creates a new trading engine
@@ -56,11 +63,24 @@ func (e *Engine) Start(ctx context.Context) error {
 	now := time.Now()
 	e.startedAt = &now
 	e.stopChan = make(chan struct{})
+	// Reset daily tracking on start
+	if e.config.PaperTradingMode {
+		e.dailyStartValue = e.paper.GetPortfolio().TotalValue
+	} else if e.wallet != nil && e.wallet.IsConfigured() {
+		bal, _ := e.wallet.GetBalanceETH(ctx)
+		e.dailyStartValue = bal
+	}
+	e.dailyLoss = 0
+	e.killSwitchTriggered = false
 	e.mu.Unlock()
 
 	e.logger.Info("trading engine started",
 		zap.Bool("paper_mode", e.config.PaperTradingMode),
 		zap.Duration("scan_interval", e.config.ScanInterval),
+		zap.Float64("max_daily_loss_pct", e.config.MaxDailyLossPct),
+		zap.Float64("max_trade_size_pct", e.config.MaxTradeSizePct),
+		zap.Duration("trade_cooldown", e.config.TradeCooldown),
+		zap.Int("max_open_positions", e.config.MaxOpenPositions),
 	)
 
 	go e.runLoop(ctx)
@@ -116,6 +136,8 @@ func (e *Engine) GetStatus() models.BotStatus {
 		TotalProfitLoss:     e.totalProfitLoss,
 		CurrentBalance:      balance,
 		ActiveOpportunities: len(e.opportunities),
+		KillSwitchTriggered: e.killSwitchTriggered,
+		DailyLoss:           e.dailyLoss,
 	}
 }
 
@@ -126,13 +148,97 @@ func (e *Engine) GetOpportunities() []models.TradingOpportunity {
 	return e.opportunities
 }
 
-// ExecuteTrade manually executes a trade
+// ExecuteTrade manually executes a trade with safety rail checks
 func (e *Engine) ExecuteTrade(ctx context.Context, opportunity models.TradingOpportunity, amount float64) (*models.Trade, error) {
-	if e.config.PaperTradingMode {
-		return e.paper.ExecuteTrade(ctx, opportunity.Token, models.TradeTypeBuy, amount)
+	if err := e.checkSafetyRails(amount); err != nil {
+		return nil, err
 	}
-	// TODO: Implement live trading
-	return nil, nil
+
+	if e.config.PaperTradingMode {
+		trade, err := e.paper.ExecuteTrade(ctx, opportunity.Token, models.TradeTypeBuy, amount)
+		if err == nil && trade != nil {
+			e.recordTradeResult(trade)
+		}
+		return trade, err
+	}
+	// TODO: Implement live trading with safety rails
+	return nil, fmt.Errorf("live trading not yet implemented")
+}
+
+// checkSafetyRails validates trade against safety limits
+func (e *Engine) checkSafetyRails(amount float64) error {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.killSwitchTriggered {
+		return fmt.Errorf("kill switch triggered: bot stopped due to excessive daily loss")
+	}
+
+	// Cooldown check
+	if !e.lastTradeTime.IsZero() && time.Since(e.lastTradeTime) < e.config.TradeCooldown {
+		return fmt.Errorf("trade cooldown active: wait %v", e.config.TradeCooldown-time.Since(e.lastTradeTime))
+	}
+
+	// Max trade size check
+	var portfolioValue float64
+	if e.config.PaperTradingMode {
+		portfolioValue = e.paper.GetPortfolio().TotalValue
+	} else if e.wallet != nil && e.wallet.IsConfigured() {
+		portfolioValue, _ = e.wallet.GetBalanceETH(context.Background())
+	}
+	if portfolioValue > 0 {
+		maxTradeSize := portfolioValue * (e.config.MaxTradeSizePct / 100)
+		if amount > maxTradeSize {
+			return fmt.Errorf("trade amount %.6f exceeds max trade size %.6f (%.1f%% of portfolio)", amount, maxTradeSize, e.config.MaxTradeSizePct)
+		}
+	}
+
+	// Max open positions check (paper mode only for now)
+	if e.config.PaperTradingMode {
+		openPositions := 0
+		for _, bal := range e.paper.GetPortfolio().TokenBalances {
+			if bal.Balance > 0 {
+				openPositions++
+			}
+		}
+		if openPositions >= e.config.MaxOpenPositions {
+			return fmt.Errorf("max open positions reached: %d", e.config.MaxOpenPositions)
+		}
+	}
+
+	return nil
+}
+
+// recordTradeResult updates safety rail state after a trade
+func (e *Engine) recordTradeResult(trade *models.Trade) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.lastTradeTime = time.Now()
+	e.totalTrades++
+
+	if trade.Status == models.TradeStatusExecuted {
+		if trade.ProfitLoss != 0 {
+			e.totalProfitLoss += trade.ProfitLoss
+			if trade.ProfitLoss > 0 {
+				e.profitableTrades++
+			}
+		}
+		// Track daily loss for kill switch
+		if trade.ProfitLoss < 0 {
+			e.dailyLoss += -trade.ProfitLoss
+			if e.dailyStartValue > 0 {
+				lossPct := (e.dailyLoss / e.dailyStartValue) * 100
+				if lossPct >= e.config.MaxDailyLossPct && e.config.KillSwitchEnabled {
+					e.killSwitchTriggered = true
+					e.logger.Warn("KILL SWITCH TRIGGERED",
+						zap.Float64("daily_loss_pct", lossPct),
+						zap.Float64("max_allowed_pct", e.config.MaxDailyLossPct),
+					)
+				}
+			}
+		}
+	}
 }
 
 func (e *Engine) runLoop(ctx context.Context) {
@@ -180,23 +286,24 @@ func (e *Engine) scan(ctx context.Context) {
 
 	if len(opportunities) > 0 {
 		e.logger.Info("found opportunities", zap.Int("count", len(opportunities)))
-		
+
 		// Auto-execute in paper mode if enabled
 		if e.config.PaperTradingMode && len(opportunities) > 0 {
-			// Execute top opportunity
 			opp := opportunities[0]
 			if opp.ConfidenceScore > 0.6 {
-				trade, err := e.paper.ExecuteTrade(ctx, opp.Token, models.TradeTypeBuy, e.config.TradeAmount)
-				if err != nil {
-					e.logger.Error("paper trade failed", zap.Error(err))
+				if err := e.checkSafetyRails(e.config.TradeAmount); err != nil {
+					e.logger.Warn("safety rail blocked auto-trade", zap.Error(err))
 				} else {
-					e.mu.Lock()
-					e.totalTrades++
-					e.mu.Unlock()
-					e.logger.Info("auto paper trade executed",
-						zap.String("token", trade.TokenSymbol),
-						zap.Float64("amount", trade.AmountIn),
-					)
+					trade, err := e.paper.ExecuteTrade(ctx, opp.Token, models.TradeTypeBuy, e.config.TradeAmount)
+					if err != nil {
+						e.logger.Error("paper trade failed", zap.Error(err))
+					} else {
+						e.recordTradeResult(trade)
+						e.logger.Info("auto paper trade executed",
+							zap.String("token", trade.TokenSymbol),
+							zap.Float64("amount", trade.AmountIn),
+						)
+					}
 				}
 			}
 		}
