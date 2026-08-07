@@ -281,10 +281,69 @@ func (h *Handler) GetMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{Success: true, Data: metrics})
 }
 
-// GetExternalHealth returns the health of external APIs (CoinGecko, DexScreener)
+// GetExternalHealth returns the health of external APIs (CoinGecko, DexScreener, GeckoTerminal)
 func (h *Handler) GetExternalHealth(c *gin.Context) {
 	status := h.discovery.Health(c.Request.Context())
 	c.JSON(http.StatusOK, Response{Success: true, Data: status})
+}
+
+// GetPositions returns all open positions with live P&L
+func (h *Handler) GetPositions(c *gin.Context) {
+	pm := h.engine.GetPositionMonitor()
+	positions := pm.GetPositions()
+	c.JSON(http.StatusOK, Response{Success: true, Data: positions})
+}
+
+// ClosePosition manually closes a position
+func (h *Handler) ClosePosition(c *gin.Context) {
+	address := c.Param("id")
+	pm := h.engine.GetPositionMonitor()
+	pos := pm.GetPosition(address)
+	if pos == nil {
+		c.JSON(http.StatusNotFound, Response{Success: false, Error: "position not found"})
+		return
+	}
+
+	trade, err := h.paper.ExecuteTrade(c.Request.Context(), pos.Token, models.TradeTypeSell, pos.Amount)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	pm.RemovePosition(address)
+	c.JSON(http.StatusOK, Response{Success: true, Data: trade})
+}
+
+// GetStrategies returns strategy statistics
+func (h *Handler) GetStrategies(c *gin.Context) {
+	se := h.engine.GetStrategyEngine()
+	names := se.ListStrategies()
+	c.JSON(http.StatusOK, Response{Success: true, Data: gin.H{"strategies": names}})
+}
+
+// GetMLStatus returns ML model status
+func (h *Handler) GetMLStatus(c *gin.Context) {
+	pred := h.engine.GetPredictor()
+	j := h.engine.GetJournal()
+	samples := j.GetTrainingData()
+	accuracy := 0.0
+	if pred.IsTrained() && len(samples) > 0 {
+		accuracy = pred.GetAccuracy(samples)
+	}
+	c.JSON(http.StatusOK, Response{Success: true, Data: gin.H{
+		"trained":     pred.IsTrained(),
+		"samples":     pred.GetSampleCount(),
+		"completed":   j.GetCompletedCount(),
+		"accuracy":    accuracy,
+		"min_samples": 20,
+	}})
+}
+
+// GetDatasourceStatus returns the status of all data providers
+func (h *Handler) GetDatasourceStatus(c *gin.Context) {
+	pm := h.discovery.GetProviderManager()
+	statuses := pm.GetProviderStatus()
+	c.JSON(http.StatusOK, Response{Success: true, Data: statuses})
 }
 
 // ConfigUpdateRequest is the request body for updating configuration
@@ -312,6 +371,7 @@ func (h *Handler) GetConfig(c *gin.Context) {
 			"gas_limit":          h.config.GasLimit,
 			"max_gas_price":      h.config.MaxGasPrice,
 			"environment":        h.config.Environment,
+			"api_tier":           h.config.APITier,
 		},
 	})
 }

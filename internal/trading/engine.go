@@ -8,8 +8,12 @@ import (
 
 	"github.com/twadelij/cryptojackal/internal/config"
 	"github.com/twadelij/cryptojackal/internal/discovery"
+	"github.com/twadelij/cryptojackal/internal/journal"
+	"github.com/twadelij/cryptojackal/internal/learning"
 	"github.com/twadelij/cryptojackal/internal/models"
 	"github.com/twadelij/cryptojackal/internal/paper"
+	"github.com/twadelij/cryptojackal/internal/portfolio"
+	"github.com/twadelij/cryptojackal/internal/strategy"
 	"github.com/twadelij/cryptojackal/internal/wallet"
 	"go.uber.org/zap"
 )
@@ -21,6 +25,11 @@ type Engine struct {
 	discovery *discovery.Service
 	paper     *paper.Service
 	logger    *zap.Logger
+
+	strategyEngine  *strategy.Engine
+	positionMonitor *portfolio.Monitor
+	journal         *journal.Journal
+	predictor       *learning.Predictor
 
 	mu        sync.RWMutex
 	isRunning bool
@@ -42,13 +51,30 @@ type Engine struct {
 
 // NewEngine creates a new trading engine
 func NewEngine(cfg *config.Config, w *wallet.Wallet, disc *discovery.Service, paperSvc *paper.Service, logger *zap.Logger) *Engine {
+	// Initialize strategy engine with default parameters
+	se := strategy.NewEngine(logger)
+	se.AddStrategy(strategy.NewMomentumStrategy(15, 100000, 50000))
+	se.AddStrategy(strategy.NewDipBuyStrategy(-15, 50000, 50000))
+	se.AddStrategy(strategy.NewVolumeSpikeStrategy(3.0, 50000, 50000))
+
+	// Initialize position monitor with TP/SL
+	pm := portfolio.NewMonitor(logger, disc, 15, 10, true)
+
+	// Initialize journal and ML predictor
+	j := journal.New()
+	pred := learning.NewPredictor(logger, 20)
+
 	return &Engine{
-		config:    cfg,
-		wallet:    w,
-		discovery: disc,
-		paper:     paperSvc,
-		logger:    logger,
-		stopChan:  make(chan struct{}),
+		config:          cfg,
+		wallet:          w,
+		discovery:       disc,
+		paper:           paperSvc,
+		logger:          logger,
+		strategyEngine:  se,
+		positionMonitor: pm,
+		journal:         j,
+		predictor:       pred,
+		stopChan:        make(chan struct{}),
 	}
 }
 
@@ -84,6 +110,7 @@ func (e *Engine) Start(ctx context.Context) error {
 	)
 
 	go e.runLoop(ctx)
+	go e.monitorLoop(ctx)
 	return nil
 }
 
@@ -241,6 +268,26 @@ func (e *Engine) recordTradeResult(trade *models.Trade) {
 	}
 }
 
+// GetStrategyEngine returns the strategy engine
+func (e *Engine) GetStrategyEngine() *strategy.Engine {
+	return e.strategyEngine
+}
+
+// GetPositionMonitor returns the position monitor
+func (e *Engine) GetPositionMonitor() *portfolio.Monitor {
+	return e.positionMonitor
+}
+
+// GetJournal returns the trade journal
+func (e *Engine) GetJournal() *journal.Journal {
+	return e.journal
+}
+
+// GetPredictor returns the ML predictor
+func (e *Engine) GetPredictor() *learning.Predictor {
+	return e.predictor
+}
+
 func (e *Engine) runLoop(ctx context.Context) {
 	// Recover from panics so the bot doesn't crash
 	defer func() {
@@ -273,11 +320,33 @@ func (e *Engine) runLoop(ctx context.Context) {
 func (e *Engine) scan(ctx context.Context) {
 	e.logger.Debug("scanning for opportunities")
 
-	opportunities, err := e.discovery.FindOpportunities(ctx, "ethereum", e.config.MinLiquidity)
+	// Get tokens from discovery service (via ProviderManager with failover)
+	tokens, err := e.discovery.GetTopGainers(ctx, "ethereum", e.config.MinLiquidity)
 	if err != nil {
-		e.logger.Warn("failed to find opportunities", zap.Error(err))
-		// Don't stop; the bot can still run with manual trades
-		opportunities = []models.TradingOpportunity{}
+		e.logger.Warn("failed to get tokens from discovery", zap.Error(err))
+		tokens = []models.Token{}
+	}
+
+	// Also get new tokens and merge
+	newTokens, err := e.discovery.GetNewTokens(ctx, "ethereum")
+	if err == nil {
+		tokens = mergeTokens(tokens, newTokens)
+	}
+
+	// Run strategies on all tokens
+	signals := e.strategyEngine.AnalyzeTokens(ctx, tokens)
+
+	// Convert signals to opportunities for backward compatibility
+	opportunities := make([]models.TradingOpportunity, 0, len(signals))
+	for _, sig := range signals {
+		opp := models.NewOpportunity(
+			sig.Token,
+			sig.Token.PriceChange24h*0.1,
+			0.01,
+			sig.Confidence,
+			sig.Strategy,
+		)
+		opportunities = append(opportunities, *opp)
 	}
 
 	e.mu.Lock()
@@ -287,25 +356,126 @@ func (e *Engine) scan(ctx context.Context) {
 	if len(opportunities) > 0 {
 		e.logger.Info("found opportunities", zap.Int("count", len(opportunities)))
 
-		// Auto-execute in paper mode if enabled
-		if e.config.PaperTradingMode && len(opportunities) > 0 {
-			opp := opportunities[0]
-			if opp.ConfidenceScore > 0.6 {
+		// Auto-execute in paper mode: pick best signal
+		if e.config.PaperTradingMode {
+			best := strategy.GetBestSignal(signals)
+			if best != nil && best.Confidence > 0.55 {
 				if err := e.checkSafetyRails(e.config.TradeAmount); err != nil {
 					e.logger.Warn("safety rail blocked auto-trade", zap.Error(err))
 				} else {
-					trade, err := e.paper.ExecuteTrade(ctx, opp.Token, models.TradeTypeBuy, e.config.TradeAmount)
+					trade, err := e.paper.ExecuteTrade(ctx, best.Token, models.TradeTypeBuy, e.config.TradeAmount)
 					if err != nil {
 						e.logger.Error("paper trade failed", zap.Error(err))
 					} else {
 						e.recordTradeResult(trade)
+						// Track position for TP/SL monitoring
+						e.positionMonitor.AddPosition(best.Token, best.Token.Price, e.config.TradeAmount, best.Strategy, best.Confidence)
+						// Record in journal for ML training
+						e.journal.RecordBuy(trade.ID, best.Strategy, journal.TradeFeatures{
+							PriceChange24h: best.Token.PriceChange24h,
+							Volume24h:      best.Token.Volume24h,
+							Liquidity:      best.Token.Liquidity,
+							MarketCap:      best.Token.MarketCap,
+							SecurityScore:  best.Token.SecurityScore,
+							HourOfDay:      time.Now().Hour(),
+							StrategyType:   best.Strategy,
+						})
 						e.logger.Info("auto paper trade executed",
 							zap.String("token", trade.TokenSymbol),
 							zap.Float64("amount", trade.AmountIn),
+							zap.String("strategy", best.Strategy),
+							zap.Float64("confidence", best.Confidence),
+							zap.String("reason", best.Reason),
 						)
 					}
 				}
 			}
 		}
 	}
+}
+
+// monitorLoop runs periodically to check open positions for TP/SL
+func (e *Engine) monitorLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			e.logger.Error("position monitor panic recovered", zap.Any("panic", r))
+		}
+	}()
+
+	monitorInterval := 30 * time.Second
+	ticker := time.NewTicker(monitorInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-e.stopChan:
+			return
+		case <-ticker.C:
+			e.checkPositions(ctx)
+		}
+	}
+}
+
+// checkPositions checks all open positions and executes sells for TP/SL
+func (e *Engine) checkPositions(ctx context.Context) {
+	if e.positionMonitor.PositionCount() == 0 {
+		return
+	}
+
+	actions := e.positionMonitor.CheckPositions(ctx)
+	for _, action := range actions {
+		if !e.config.PaperTradingMode {
+			continue
+		}
+
+		trade, err := e.paper.ExecuteTrade(ctx, action.Position.Token, models.TradeTypeSell, action.Position.Amount)
+		if err != nil {
+			e.logger.Error("failed to execute sell", zap.Error(err), zap.String("token", action.Position.Token.Symbol))
+			continue
+		}
+
+		e.recordTradeResult(trade)
+		e.positionMonitor.RemovePosition(action.Position.Token.Address)
+
+		// Record sell in journal for ML training
+		profitPct := 0.0
+		if action.Position.EntryPrice > 0 {
+			profitPct = ((trade.Price - action.Position.EntryPrice) / action.Position.EntryPrice) * 100
+		}
+		e.journal.RecordSell(trade.ID, profitPct, time.Since(action.Position.BuyTime))
+
+		// Retrain ML model if we have enough samples
+		if e.journal.GetCompletedCount() >= 20 && e.journal.GetCompletedCount()%10 == 0 {
+			samples := e.journal.GetTrainingData()
+			e.predictor.Train(samples)
+		}
+
+		e.logger.Info("position closed",
+			zap.String("token", action.Position.Token.Symbol),
+			zap.String("reason", action.Reason),
+			zap.String("type", action.Type),
+			zap.Float64("profit_loss", trade.ProfitLoss),
+		)
+	}
+}
+
+// mergeTokens combines two token lists, deduplicating by address
+func mergeTokens(a, b []models.Token) []models.Token {
+	seen := make(map[string]bool)
+	result := make([]models.Token, 0, len(a)+len(b))
+	for _, t := range a {
+		if !seen[t.Address] {
+			seen[t.Address] = true
+			result = append(result, t)
+		}
+	}
+	for _, t := range b {
+		if !seen[t.Address] {
+			seen[t.Address] = true
+			result = append(result, t)
+		}
+	}
+	return result
 }

@@ -45,6 +45,11 @@ type Config struct {
 	CoinGeckoAPIKey   string
 	DexScreenerAPIKey string
 
+	// API Tier and Rate Limiting
+	APITier              string
+	GeckoTerminalEnabled bool
+	APICooldownMinutes   int
+
 	// Notifications
 	TelegramBotToken  string
 	TelegramChatID    string
@@ -84,7 +89,7 @@ func Load() (*Config, error) {
 		MaxSlippage:    getEnvFloat("MAX_SLIPPAGE", 0.5),
 		MinLiquidity:   getEnvFloat("MIN_LIQUIDITY", 10000),
 		MaxPriceImpact: getEnvFloat("MAX_PRICE_IMPACT", 3.0),
-		ScanInterval:   time.Duration(getEnvInt("SCAN_INTERVAL_SECONDS", 30)) * time.Second,
+		ScanInterval:   time.Duration(getEnvInt("SCAN_INTERVAL_SECONDS", getTierScanInterval(getEnv("API_TIER", "free")))) * time.Second,
 		GasLimit:       safeUint64(getEnvInt("GAS_LIMIT", 300000)),
 		MaxGasPrice:    safeUint64(getEnvInt("MAX_GAS_PRICE_GWEI", 100)),
 
@@ -102,6 +107,11 @@ func Load() (*Config, error) {
 		// API Keys
 		CoinGeckoAPIKey:   getEnv("COINGECKO_API_KEY", ""),
 		DexScreenerAPIKey: getEnv("DEXSCREENER_API_KEY", ""),
+
+		// API Tier and Rate Limiting
+		APITier:              getEnv("API_TIER", "free"),
+		GeckoTerminalEnabled: getEnvBool("GECKOTERMINAL_ENABLED", true),
+		APICooldownMinutes:   getEnvInt("API_COOLDOWN_MINUTES", 5),
 
 		// Notifications
 		TelegramBotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
@@ -166,6 +176,18 @@ func getEnvBool(key string, defaultValue bool) bool {
 	return defaultValue
 }
 
+// getTierScanInterval returns the default scan interval for the given API tier
+func getTierScanInterval(tier string) int {
+	switch tier {
+	case "basic":
+		return 60
+	case "analyst":
+		return 30
+	default:
+		return 180
+	}
+}
+
 // LoadFromStorage overrides config values with those stored in the database
 func (c *Config) LoadFromStorage(store *storage.Storage) error {
 	configs, err := store.GetAllConfigs()
@@ -219,6 +241,8 @@ func (c *Config) LoadFromStorage(store *storage.Storage) error {
 			}
 		case "environment":
 			c.Environment = value
+		case "api_tier":
+			c.APITier = value
 		}
 	}
 	return nil
@@ -239,6 +263,7 @@ func (c *Config) SaveToStorage(store *storage.Storage) error {
 		"eth_node_url":          c.NodeURL,
 		"chain_id":              fmt.Sprintf("%d", c.ChainID),
 		"environment":           c.Environment,
+		"api_tier":              c.APITier,
 	}
 
 	for key, value := range pairs {

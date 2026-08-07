@@ -1,10 +1,14 @@
 # CryptoJackal
 
-A cryptocurrency trading bot with a web dashboard. Built in Go with a React frontend.
+An autonomous cryptocurrency trading bot with multi-source data feeds, strategy engine, and ML-based trade evaluation. Built in Go with a React frontend.
 
 ## What It Does
 
-- **Token Discovery** - Finds trending and new crypto tokens from CoinGecko and DexScreener
+- **Multi-Source Token Discovery** - Fetches tokens from DexScreener, GeckoTerminal, and CoinGecko with automatic failover
+- **Rate Limiting & Caching** - Token bucket per source, 429 detection with exponential backoff, in-memory TTL cache
+- **Strategy Engine** - 3 strategies (momentum breakout, dip buy, volume spike) with confidence scoring
+- **Position Monitor** - Take profit / stop loss / trailing stop on open positions
+- **Trade Journal & ML** - Records trade features and outcomes, trains logistic regression model to predict win probability
 - **Paper Trading** - Practice trading with fake money (recommended for beginners)
 - **Live Trading** - Execute real trades on Ethereum (requires setup)
 - **Web Dashboard** - Control everything from your browser
@@ -82,7 +86,11 @@ Open `http://localhost:8080`.
 | `TRADE_AMOUNT` | How much to spend per trade | `100` |
 | `STOP_LOSS` | Auto-sell if price drops this percentage | `5` |
 | `MAX_SLIPPAGE` | Maximum price difference allowed during trade | `0.5` |
-| `SCAN_INTERVAL` | How often to scan for opportunities | `60s` |
+| `SCAN_INTERVAL_SECONDS` | How often to scan for opportunities | `180` (free tier) |
+| `API_TIER` | API subscription tier: `free`, `basic`, `analyst` | `free` |
+| `GECKOTERMINAL_ENABLED` | Enable GeckoTerminal as data source | `true` |
+| `API_COOLDOWN_MINUTES` | Cooldown after 429 rate limit | `5` |
+| `COINGECKO_API_KEY` | CoinGecko API key (optional, improves rate limits) | empty |
 | `ETH_NODE_URL` | Your Ethereum RPC endpoint | empty |
 | `PRIVATE_KEY` | Your wallet private key (live only) | empty |
 | `ADMIN_PASSWORD` | Dashboard login password | `admin` |
@@ -112,6 +120,62 @@ Open `http://localhost:8080`.
 | `/api/paper/history` | GET | Get paper trade history (filter: `?type=buy&status=executed&limit=50`) |
 | `/api/paper/export` | GET | Export trades as JSON or CSV (`?format=csv`) |
 | `/api/metrics` | GET | Get trading statistics |
+| `/api/positions` | GET | Get open positions with live P&L |
+| `/api/positions/:id/close` | POST | Manually close a position |
+| `/api/strategies` | GET | List registered strategies |
+| `/api/ml/status` | GET | ML model status (trained, samples, accuracy) |
+| `/api/datasources/status` | GET | Status of all data providers |
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     Web Dashboard                         │
+└──────────────────────────┬───────────────────────────────┘
+                           │ HTTP (Gin)
+                           ▼
+┌──────────────────────────────────────────────────────────┐
+│                   Trading Engine                          │
+│                 internal/trading/engine.go                │
+│                                                           │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐  │
+│  │ Strategy    │  │ Position     │  │ Journal + ML    │  │
+│  │ Engine      │  │ Monitor      │  │ Predictor       │  │
+│  │ (3 strats)  │  │ (TP/SL/TS)   │  │ (logistic reg)  │  │
+│  └──────┬──────┘  └──────────────┘  └─────────────────┘  │
+│         │                                                 │
+└─────────┼─────────────────────────────────────────────────┘
+          ▼
+┌──────────────────────────────────────────────────────────┐
+│                 ProviderManager                           │
+│              internal/datasource/manager.go               │
+│                                                           │
+│  Failover: DexScreener → GeckoTerminal → CoinGecko       │
+│  Each with: RateLimiter + ResponseCache                   │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Internal Packages
+
+| Package | Purpose |
+|---------|---------|
+| `internal/datasource` | Rate limiter (token bucket), TTL cache, GeckoTerminal client, ProviderManager with failover |
+| `internal/discovery` | DexScreener + CoinGecko clients (implement Provider interface), discovery service |
+| `internal/strategy` | Strategy interface + 3 strategies: momentum, dip buy, volume spike |
+| `internal/portfolio` | Position monitor with take profit, stop loss, trailing stop |
+| `internal/journal` | Trade journal recording features + outcomes for ML training |
+| `internal/learning` | Logistic regression predictor (gradient descent), trains on trade history |
+| `internal/trading` | Main engine: scan loop, monitor loop, safety rails, auto-execute |
+| `internal/paper` | Paper trading service with portfolio management |
+| `internal/config` | Config with API_TIER support (free/basic/analyst) |
+
+### API Tiers
+
+| Tier | Scan Interval | Rate Limits | Cost |
+|------|--------------|------------|------|
+| `free` | 180s | Conservative (DexScreener 300/min, CoinGecko 100/min, GeckoTerminal 30/min) | Free |
+| `basic` | 60s | 3x limits, CoinGecko 300/min, GeckoTerminal 250/min | $29/mo |
+| `analyst` | 30s | 5x limits, higher caps | $103/mo |
 
 ## Development
 

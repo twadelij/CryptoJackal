@@ -33,8 +33,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.MaxPriceImpact != 3.0 {
 		t.Errorf("expected default max price impact 3.0, got %f", cfg.MaxPriceImpact)
 	}
-	if cfg.ScanInterval != 30*time.Second {
-		t.Errorf("expected default scan interval 30s, got %v", cfg.ScanInterval)
+	if cfg.ScanInterval != 180*time.Second {
+		t.Errorf("expected default scan interval 180s, got %v", cfg.ScanInterval)
 	}
 	if cfg.GasLimit != 300000 {
 		t.Errorf("expected default gas limit 300000, got %d", cfg.GasLimit)

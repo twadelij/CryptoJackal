@@ -95,6 +95,64 @@ docker compose up --build
 5. "Paper Trading" tab laadt trades
 6. Mobile view (Chrome DevTools responsive) werkt zonder scroll-issues
 
+### 6. Strategy Engine Test
+
+**Doel:** Strategieen genereren signals met juiste confidence.
+
+**Test stappen:**
+1. Start app in paper mode
+2. Start bot (`POST /api/bot/start`)
+3. Wacht een scan cycle (3 min op free tier)
+4. Check `/api/trading/opportunities` - moet signals bevatten met strategy naam
+5. Check `/api/strategies` - moet 3 strategieen tonen: momentum, dip_buy, volume_spike
+
+**Wat moet werken:**
+- [ ] Opportunities hebben een strategy field
+- [ ] Confidence scores zijn tussen 0.0 en 1.0
+- [ ] Best signal wordt auto-executed bij confidence > 0.55
+
+### 7. Position Monitor Test
+
+**Doel:** TP/SL werkt op open positions.
+
+**Test stappen:**
+1. Start bot, wacht tot er een auto-trade is
+2. Check `/api/positions` - moet de open positie tonen
+3. Wacht tot TP of SL threshold bereikt wordt (of simuleer met hoge TP/SL)
+4. Position moet automatisch gesloten worden
+5. Check `/api/paper/history` - moet een sell trade tonen
+
+**Wat moet werken:**
+- [ ] Open positions tonen entry price en strategy
+- [ ] TP/SL triggers sluiten de positie automatisch
+- [ ] Trailing stop werkt (volgt highest price)
+- [ ] `POST /api/positions/:id/close` sluit handmatig
+
+### 8. ML Model Test
+
+**Doel:** ML predictor traint op trade history.
+
+**Test stappen:**
+1. Check `/api/ml/status` - toont trained=false, samples=0
+2. Doe 20+ trades (paper mode, laat bot draaien)
+3. Check `/api/ml/status` - trained=true na 20 completed trades
+4. Accuracy moet > 0.5 zijn (beter dan random)
+
+### 9. Multi-Source Failover Test
+
+**Doel:** Als een API source eruit ligt, gaat de bot door met de volgende.
+
+**Test stappen:**
+1. Check `/api/datasources/status` - toont alle 3 providers
+2. Check `/api/health/external` - toont health per provider
+3. Als DexScreener down is, moet GeckoTerminal tokens leveren
+4. Als beide down zijn, moet CoinGecko fallback geven
+
+**Wat moet werken:**
+- [ ] ProviderManager probeert providers in volgorde
+- [ ] Rate limited providers worden overgeslagen (cooldown)
+- [ ] Demo tokens fallback als alle sources down zijn
+
 ## Regression Test (voor na elke grote change)
 
 Voer dit script uit na elke sessie:

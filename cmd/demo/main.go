@@ -31,7 +31,7 @@ func main() {
 
 	// Demo discovery service
 	fmt.Println("📡 Testing Token Discovery...")
-	discSvc := discovery.NewService(cfg.CoinGeckoAPIKey, logger)
+	discSvc := discovery.NewService(cfg.APITier, cfg.CoinGeckoAPIKey, logger)
 	
 	trending, err := discSvc.GetTrendingTokens(ctx)
 	if err != nil {

@@ -98,6 +98,19 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 
 			// External API health
 			protected.GET("/health/external", handler.GetExternalHealth)
+
+			// Positions
+			protected.GET("/positions", handler.GetPositions)
+			protected.POST("/positions/:id/close", handler.ClosePosition)
+
+			// Strategies
+			protected.GET("/strategies", handler.GetStrategies)
+
+			// ML
+			protected.GET("/ml/status", handler.GetMLStatus)
+
+			// Datasource status
+			protected.GET("/datasources/status", handler.GetDatasourceStatus)
 		}
 	}
 

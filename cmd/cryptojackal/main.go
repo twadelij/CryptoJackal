@@ -78,7 +78,7 @@ func main() {
 	}
 
 	// Initialize services
-	discoverySvc := discovery.NewService(cfg.CoinGeckoAPIKey, logger)
+	discoverySvc := discovery.NewService(cfg.APITier, cfg.CoinGeckoAPIKey, logger)
 	paperSvc := paper.NewServiceWithStorage(cfg.InitialBalance, logger, store)
 	paperSvc.SetDiscoveryService(discoverySvc)
 	engine := trading.NewEngine(cfg, w, discoverySvc, paperSvc, logger)

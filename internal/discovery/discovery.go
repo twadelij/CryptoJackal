@@ -8,94 +8,129 @@ import (
 	"sync"
 	"time"
 
+	"github.com/twadelij/cryptojackal/internal/datasource"
 	"github.com/twadelij/cryptojackal/internal/models"
 	"go.uber.org/zap"
 )
 
-// Service manages token discovery from multiple sources
+// Service manages token discovery from multiple sources via ProviderManager
 type Service struct {
-	coingecko   *CoinGeckoClient
-	dexscreener *DexScreenerClient
-	logger      *zap.Logger
-
-	// Cache
-	mu            sync.RWMutex
-	trendingCache []models.Token
-	cacheTime     time.Time
-	cacheTTL      time.Duration
+	coingecko     *CoinGeckoClient
+	dexscreener   *DexScreenerClient
+	geckoterminal *datasource.GeckoTerminalClient
+	providerMgr   *datasource.ProviderManager
+	logger        *zap.Logger
 
 	// Demo state for fallback tokens
+	demoMu     sync.Mutex
 	demoTokens []models.Token
 }
 
 // HealthStatus represents the health of external APIs
 type HealthStatus struct {
-	CoinGecko   bool `json:"coingecko"`
-	DexScreener bool `json:"dexscreener"`
+	CoinGecko     bool `json:"coingecko"`
+	DexScreener   bool `json:"dexscreener"`
+	GeckoTerminal bool `json:"geckoterminal"`
 }
 
-// NewService creates a new discovery service
-func NewService(coingeckoAPIKey string, logger *zap.Logger) *Service {
+// NewService creates a new discovery service with multi-source support
+func NewService(apiTier, coingeckoAPIKey string, logger *zap.Logger) *Service {
+	limits := datasource.GetTierLimits(apiTier)
+	cache := datasource.NewResponseCache()
+
+	dsLimiter := datasource.NewRateLimiter(limits.DexScreener)
+	gtLimiter := datasource.NewRateLimiter(limits.GeckoTerminal)
+	cgLimiter := datasource.NewRateLimiter(limits.CoinGecko)
+	cgLimiter.SetMonthlyCap(limits.CoinGeckoCap)
+
+	dexscreener := NewDexScreenerClient(logger, dsLimiter, cache)
+	coingecko := NewCoinGeckoClient(coingeckoAPIKey, logger, cgLimiter, cache)
+	geckoterminal := datasource.NewGeckoTerminalClient(logger, gtLimiter, cache)
+
+	// ProviderManager with failover: DexScreener > GeckoTerminal > CoinGecko
+	pm := datasource.NewProviderManager(logger, cache, dexscreener, geckoterminal, coingecko)
+
 	s := &Service{
-		coingecko:   NewCoinGeckoClient(coingeckoAPIKey, logger),
-		dexscreener: NewDexScreenerClient(logger),
-		logger:      logger,
-		cacheTTL:    5 * time.Minute,
+		coingecko:     coingecko,
+		dexscreener:   dexscreener,
+		geckoterminal: geckoterminal,
+		providerMgr:   pm,
+		logger:        logger,
 	}
 	s.demoTokens = s.initialDemoTokens()
 	return s
+}
+
+// GetProviderManager returns the provider manager for direct access
+func (s *Service) GetProviderManager() *datasource.ProviderManager {
+	return s.providerMgr
 }
 
 // Health checks if external APIs are reachable
 func (s *Service) Health(ctx context.Context) HealthStatus {
 	status := HealthStatus{}
 
-	// Check CoinGecko with a quick ping
 	cgCtx, cgCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cgCancel()
-	_, cgErr := s.coingecko.GetTrendingTokens(cgCtx)
-	status.CoinGecko = cgErr == nil
+	status.CoinGecko = s.coingecko.IsAvailable()
+	if status.CoinGecko {
+		_, cgErr := s.coingecko.GetTrendingTokens(cgCtx)
+		status.CoinGecko = cgErr == nil
+	}
 
-	// Check DexScreener with a quick ping
 	dsCtx, dsCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer dsCancel()
-	_, dsErr := s.dexscreener.GetBoostedTokens(dsCtx)
-	status.DexScreener = dsErr == nil
+	status.DexScreener = s.dexscreener.IsAvailable()
+	if status.DexScreener {
+		_, dsErr := s.dexscreener.GetBoostedTokens(dsCtx)
+		status.DexScreener = dsErr == nil
+	}
+
+	status.GeckoTerminal = s.geckoterminal.IsAvailable()
 
 	return status
 }
 
-// GetTrendingTokens returns trending tokens (cached)
+// GetTrendingTokens returns trending tokens via ProviderManager with failover
 func (s *Service) GetTrendingTokens(ctx context.Context) ([]models.Token, error) {
-	s.mu.RLock()
-	if time.Since(s.cacheTime) < s.cacheTTL && len(s.trendingCache) > 0 {
-		tokens := s.trendingCache
-		s.mu.RUnlock()
-		return tokens, nil
-	}
-	s.mu.RUnlock()
-
-	tokens, err := s.coingecko.GetTrendingTokens(ctx)
+	tokens, err := s.providerMgr.GetTrending(ctx)
 	if err != nil {
-		return nil, err
+		s.logger.Warn("all providers failed for trending, using fallback", zap.Error(err))
+		return s.fallbackTokens(), nil
 	}
-
-	s.mu.Lock()
-	s.trendingCache = tokens
-	s.cacheTime = time.Now()
-	s.mu.Unlock()
-
 	return tokens, nil
 }
 
-// GetNewTokens discovers new tokens from DexScreener
+// GetNewTokens discovers new tokens via ProviderManager with failover
 func (s *Service) GetNewTokens(ctx context.Context, chain string) ([]models.Token, error) {
-	return s.dexscreener.GetNewPairs(ctx, chain)
+	tokens, err := s.providerMgr.GetNewTokens(ctx)
+	if err != nil {
+		s.logger.Warn("all providers failed for new tokens, using fallback", zap.Error(err))
+		return s.fallbackTokens(), nil
+	}
+	return tokens, nil
 }
 
-// GetTopGainers returns top gaining tokens
+// GetTopGainers returns top gaining tokens via ProviderManager with failover
 func (s *Service) GetTopGainers(ctx context.Context, chain string, minLiquidity float64) ([]models.Token, error) {
-	return s.dexscreener.GetTopGainers(ctx, chain, minLiquidity)
+	tokens, err := s.providerMgr.GetTopGainers(ctx)
+	if err != nil {
+		s.logger.Warn("all providers failed for top gainers, using fallback", zap.Error(err))
+		tokens = s.fallbackTokens()
+	}
+
+	// Filter by liquidity if specified
+	if minLiquidity > 0 {
+		filtered := make([]models.Token, 0, len(tokens))
+		for _, t := range tokens {
+			if t.Liquidity >= minLiquidity {
+				filtered = append(filtered, t)
+			}
+		}
+		tokens = filtered
+	}
+
+	return tokens, nil
 }
 
 // AnalyzeToken analyzes a specific token
@@ -104,7 +139,6 @@ func (s *Service) AnalyzeToken(ctx context.Context, address string) (*models.Tok
 	tokens, err := s.dexscreener.SearchToken(ctx, address)
 	if err == nil && len(tokens) > 0 {
 		token := tokens[0]
-		// Calculate a basic security score
 		token.SecurityScore = s.calculateSecurityScore(&token)
 		return &token, nil
 	}
@@ -189,8 +223,8 @@ func (s *Service) FindOpportunities(ctx context.Context, chain string, minLiquid
 // fallbackTokens returns demo tokens when external APIs are unavailable
 // Prices fluctuate slightly each call for a dynamic demo feel
 func (s *Service) fallbackTokens() []models.Token {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.demoMu.Lock()
+	defer s.demoMu.Unlock()
 
 	// Update prices with small random variation (-5% to +5%)
 	for i := range s.demoTokens {
