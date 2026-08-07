@@ -36,7 +36,7 @@ cp .env.example .env
 go run ./cmd/cryptojackal
 ```
 
-De app start op http://localhost:8080.
+De app start op http://localhost:8081.
 
 ## Stap 4: Verify de nieuwe features
 
@@ -44,38 +44,38 @@ In een tweede terminal op .252:
 
 ```bash
 # Login en haal token
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:8081/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['token'])")
 
 echo "Token: $TOKEN"
 
 # Check health
-curl -s http://localhost:8080/api/health | python3 -m json.tool
+curl -s http://localhost:8081/api/health | python3 -m json.tool
 
 # Check datasource status (nieuw!)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/datasources/status | python3 -m json.tool
+  http://localhost:8081/api/datasources/status | python3 -m json.tool
 
 # Check strategies (nieuw!)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/strategies | python3 -m json.tool
+  http://localhost:8081/api/strategies | python3 -m json.tool
 
 # Check ML status (nieuw!)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/ml/status | python3 -m json.tool
+  http://localhost:8081/api/ml/status | python3 -m json.tool
 
 # Check positions (nieuw! - zal leeg zijn zonder open trades)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/positions | python3 -m json.tool
+  http://localhost:8081/api/positions | python3 -m json.tool
 
 # Check external API health
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/health/external | python3 -m json.tool
+  http://localhost:8081/api/health/external | python3 -m json.tool
 
 # Check config (api_tier moet zichtbaar zijn)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/config | python3 -m json.tool
+  http://localhost:8081/api/config | python3 -m json.tool
 ```
 
 ## Stap 5: Start bot en watch auto-trading
@@ -83,26 +83,26 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 ```bash
 # Start de bot
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/bot/start | python3 -m json.tool
+  http://localhost:8081/api/bot/start | python3 -m json.tool
 
 # Wacht 3 minuten (1 scan cycle op free tier) en check dan:
 sleep 180
 
 # Check opportunities (moet signals bevatten met strategy naam)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/trading/opportunities | python3 -m json.tool
+  http://localhost:8081/api/trading/opportunities | python3 -m json.tool
 
 # Check positions (als er een auto-trade was)
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/positions | python3 -m json.tool
+  http://localhost:8081/api/positions | python3 -m json.tool
 
 # Check bot status
 curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/bot/status | python3 -m json.tool
+  http://localhost:8081/api/bot/status | python3 -m json.tool
 
 # Stop de bot
 curl -s -X POST -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/bot/stop | python3 -m json.tool
+  http://localhost:8081/api/bot/stop | python3 -m json.tool
 ```
 
 ## Verwachte output
