@@ -14,7 +14,30 @@
     </style>
 </head>
 <body class="gradient-bg min-h-screen text-white">
-    <div id="app" class="container mx-auto px-4 py-8">
+    <!-- Login Screen -->
+    <div id="login-screen" class="container mx-auto px-4 py-8 max-w-md">
+        <div class="flex items-center justify-center gap-3 mb-8 mt-12">
+            <div class="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
+                <span class="text-3xl">🐺</span>
+            </div>
+            <h1 class="text-3xl font-bold">CryptoJackal</h1>
+        </div>
+        <div class="card rounded-2xl p-8">
+            <h2 class="text-xl font-bold mb-6 text-center">Login</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Password</label>
+                    <input type="password" id="login-password" placeholder="Admin password"
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 focus:border-pink-500 outline-none"
+                        onkeypress="if(event.key==='Enter') doLogin()">
+                </div>
+                <button onclick="doLogin()" id="login-btn" class="btn-primary w-full py-3 rounded-lg font-semibold">Login</button>
+                <div id="login-error" class="text-red-400 text-sm text-center hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="container mx-auto px-4 py-8 hidden">
         <!-- Header -->
         <header class="flex items-center justify-between mb-8">
             <div class="flex items-center gap-3">
@@ -23,8 +46,11 @@
                 </div>
                 <h1 class="text-2xl font-bold">CryptoJackal</h1>
             </div>
-            <div id="status-badge" class="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
-                Loading...
+            <div class="flex items-center gap-3">
+                <div id="status-badge" class="px-3 py-1 rounded-full text-sm bg-green-500/20 text-green-400">
+                    Loading...
+                </div>
+                <button onclick="doLogout()" class="px-3 py-1 rounded-full text-sm bg-white/5 border border-white/10 hover:bg-white/10">Logout</button>
             </div>
         </header>
 
@@ -219,9 +245,66 @@
 
     <script>
         let config = { mode: 'paper', configured: false };
-        
-        // Initialize
-        document.addEventListener('DOMContentLoaded', async () => {
+        let jwtToken = localStorage.getItem('cryptojackal_token') || null;
+
+        async function apiFetch(url, options = {}) {
+            if (jwtToken) {
+                options.headers = options.headers || {};
+                options.headers['Authorization'] = 'Bearer ' + jwtToken;
+            }
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                jwtToken = null;
+                localStorage.removeItem('cryptojackal_token');
+                showLogin();
+                throw new Error('Session expired');
+            }
+            return res;
+        }
+
+        async function doLogin() {
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+            errorEl.classList.add('hidden');
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: password })
+                });
+                const data = await res.json();
+                if (data.success && data.data.token) {
+                    jwtToken = data.data.token;
+                    localStorage.setItem('cryptojackal_token', jwtToken);
+                    await initApp();
+                } else {
+                    errorEl.textContent = data.error || 'Login failed';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errorEl.textContent = 'Server connection failed';
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function doLogout() {
+            jwtToken = null;
+            localStorage.removeItem('cryptojackal_token');
+            showLogin();
+        }
+
+        function showLogin() {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('app').classList.add('hidden');
+        }
+
+        function showApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+        }
+
+        async function initApp() {
+            showApp();
             lucide.createIcons();
             await checkHealth();
             await loadPaperBalance();
@@ -229,6 +312,20 @@
             await loadHistory();
             showDashboard();
             loadTokens();
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            if (jwtToken) {
+                try {
+                    await initApp();
+                } catch (e) {
+                    showLogin();
+                }
+            } else {
+                showLogin();
+            }
         });
 
         async function checkHealth() {
@@ -249,7 +346,7 @@
         
         async function loadPaperBalance() {
             try {
-                const res = await fetch('/api/paper/balance');
+                const res = await apiFetch('/api/paper/balance');
                 const data = await res.json();
                 if (data.success) {
                     portfolio = data.data;
@@ -260,13 +357,12 @@
                 }
             } catch (e) {
                 console.error('Failed to load balance:', e);
-                showNotification('Kon balans niet laden. Check of de server draait.', 'error');
             }
         }
         
         async function loadMetrics() {
             try {
-                const res = await fetch('/api/metrics');
+                const res = await apiFetch('/api/metrics');
                 const data = await res.json();
                 if (data.success) {
                     document.getElementById('trades').textContent = data.data.total_trades || 0;
@@ -274,7 +370,6 @@
                 }
             } catch (e) {
                 console.error('Failed to load metrics:', e);
-                showNotification('Kon metrics niet laden.', 'error');
             }
         }
 
@@ -282,7 +377,7 @@
         
         async function loadTokens() {
             try {
-                const res = await fetch('/api/discovery/new');
+                const res = await apiFetch('/api/discovery/new');
                 const data = await res.json();
                 if (data.success && data.data) {
                     tokens = data.data;
@@ -306,7 +401,6 @@
                 }
             } catch (e) {
                 console.error('Failed to load tokens:', e);
-                showNotification('Kon tokens niet laden. API rate limit?', 'error');
             }
         }
         
@@ -350,7 +444,7 @@
             }
             
             try {
-                const res = await fetch('/api/paper/trade', {
+                const res = await apiFetch('/api/paper/trade', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -387,7 +481,7 @@
         
         async function loadHistory() {
             try {
-                const res = await fetch('/api/paper/history');
+                const res = await apiFetch('/api/paper/history');
                 const data = await res.json();
                 if (data.success && data.data) {
                     const list = document.getElementById('history-list');
@@ -458,7 +552,7 @@
             config.stop_loss = parseFloat(document.getElementById('stop-loss').value) || 5;
 
             try {
-                const res = await fetch('/api/config', {
+                const res = await apiFetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -486,7 +580,7 @@
 
         async function startBot() {
             try {
-                const res = await fetch('/api/bot/start', { method: 'POST' });
+                const res = await apiFetch('/api/bot/start', { method: 'POST' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 document.getElementById('bot-status').textContent = 'Status: Running';
                 document.getElementById('start-btn').classList.add('hidden');
@@ -500,7 +594,7 @@
 
         async function stopBot() {
             try {
-                const res = await fetch('/api/bot/stop', { method: 'POST' });
+                const res = await apiFetch('/api/bot/stop', { method: 'POST' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
                 document.getElementById('bot-status').textContent = 'Status: Stopped';
                 document.getElementById('start-btn').classList.remove('hidden');
