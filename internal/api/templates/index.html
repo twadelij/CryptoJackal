@@ -153,18 +153,22 @@
                 <div class="card rounded-xl p-4">
                     <div class="text-gray-400 text-sm mb-1">Balance</div>
                     <div id="balance" class="text-2xl font-bold">€0.00</div>
+                    <div class="text-xs text-gray-500 mt-1">Virtual funds (paper trading)</div>
                 </div>
                 <div class="card rounded-xl p-4">
-                    <div class="text-gray-400 text-sm mb-1">P&L</div>
+                    <div class="text-gray-400 text-sm mb-1" title="Profit & Loss = total profit or loss across all trades">P&L (Profit & Loss)</div>
                     <div id="pnl" class="text-2xl font-bold text-green-400">+€0.00</div>
+                    <div class="text-xs text-gray-500 mt-1">Total profit or loss from all trades</div>
                 </div>
                 <div class="card rounded-xl p-4">
                     <div class="text-gray-400 text-sm mb-1">Total Trades</div>
                     <div id="trades" class="text-2xl font-bold">0</div>
+                    <div class="text-xs text-gray-500 mt-1" id="auto-trades-label">Auto & manual trades combined</div>
                 </div>
                 <div class="card rounded-xl p-4">
                     <div class="text-gray-400 text-sm mb-1">Win Rate</div>
                     <div id="winrate" class="text-2xl font-bold">0%</div>
+                    <div class="text-xs text-gray-500 mt-1">Percentage of profitable trades</div>
                 </div>
             </div>
 
@@ -174,6 +178,7 @@
                     <div>
                         <h3 class="font-bold text-lg">Trading Bot</h3>
                         <p id="bot-status" class="text-gray-400 text-sm">Status: Stopped</p>
+                        <p id="bot-info" class="text-gray-500 text-xs mt-1">Click Start to let the bot scan and trade automatically</p>
                     </div>
                     <div class="flex gap-3">
                         <button onclick="startBot()" id="start-btn" class="btn-primary px-6 py-2 rounded-lg font-semibold">Start</button>
@@ -186,10 +191,14 @@
             </div>
 
             <!-- Tabs -->
-            <div class="flex gap-4 mb-4 border-b border-white/10">
-                <button onclick="showTab('tokens')" class="tab-btn px-4 py-2 border-b-2 border-pink-500 font-semibold" data-tab="tokens">Trending Tokens</button>
-                <button onclick="showTab('opportunities')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white" data-tab="opportunities">Opportunities</button>
-                <button onclick="showTab('history')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white" data-tab="history">Trade History</button>
+            <div class="flex gap-2 mb-4 border-b border-white/10 overflow-x-auto">
+                <button onclick="showTab('tokens')" class="tab-btn px-4 py-2 border-b-2 border-pink-500 font-semibold whitespace-nowrap" data-tab="tokens">Trending Tokens</button>
+                <button onclick="showTab('opportunities')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="opportunities">Opportunities</button>
+                <button onclick="showTab('positions')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="positions">Open Positions</button>
+                <button onclick="showTab('history')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="history">Trade History</button>
+                <button onclick="showTab('strategies')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="strategies">Strategies</button>
+                <button onclick="showTab('ml')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="ml">ML Model</button>
+                <button onclick="showTab('datasources')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="datasources">Data Sources</button>
             </div>
 
             <!-- Tab Content -->
@@ -234,11 +243,32 @@
             </div>
 
             <div id="tab-opportunities" class="tab-content hidden">
+                <p class="text-gray-400 text-sm mb-4">Trading signals found by the bot's strategies. The bot auto-trades these in paper mode.</p>
                 <div id="opportunities-list" class="space-y-3"></div>
+            </div>
+
+            <div id="tab-positions" class="tab-content hidden">
+                <p class="text-gray-400 text-sm mb-4">Open positions with live P&L. The bot auto-sells at Take Profit (+15%) or Stop Loss (-10%).</p>
+                <div id="positions-list" class="space-y-3"></div>
             </div>
 
             <div id="tab-history" class="tab-content hidden">
                 <div id="history-list" class="space-y-3"></div>
+            </div>
+
+            <div id="tab-strategies" class="tab-content hidden">
+                <p class="text-gray-400 text-sm mb-4">Trading strategies the bot uses to find opportunities.</p>
+                <div id="strategies-list" class="space-y-3"></div>
+            </div>
+
+            <div id="tab-ml" class="tab-content hidden">
+                <p class="text-gray-400 text-sm mb-4">Machine Learning model that learns from past trades to improve future decisions.</p>
+                <div id="ml-info" class="space-y-3"></div>
+            </div>
+
+            <div id="tab-datasources" class="tab-content hidden">
+                <p class="text-gray-400 text-sm mb-4">External API data sources with automatic failover if one goes down.</p>
+                <div id="datasources-list" class="space-y-3"></div>
             </div>
         </div>
     </div>
@@ -310,8 +340,14 @@
             await loadPaperBalance();
             await loadMetrics();
             await loadHistory();
+            await loadBotStatus();
             showDashboard();
             loadTokens();
+            loadOpportunities();
+            loadPositions();
+            loadStrategies();
+            loadMLStatus();
+            loadDatasources();
         }
 
         // Initialize
@@ -416,7 +452,7 @@
             updateTradeCost();
             
             // Check if we own this token
-            const owned = portfolio?.token_balances?.[selectedToken.address];
+            const owned = portfolio && portfolio.token_balances && portfolio.token_balances[selectedToken.address];
             document.getElementById('sell-btn').classList.toggle('hidden', !owned);
             
             document.getElementById('trade-modal').classList.remove('hidden');
@@ -578,17 +614,36 @@
             }
         }
 
+        async function loadBotStatus() {
+            try {
+                const res = await apiFetch('/api/bot/status');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const s = data.data;
+                    const running = s.is_running;
+                    document.getElementById('bot-status').textContent = running ? 'Status: Running (' + s.mode + ' mode)' : 'Status: Stopped';
+                    document.getElementById('start-btn').classList.toggle('hidden', running);
+                    document.getElementById('stop-btn').classList.toggle('hidden', !running);
+                    if (running) {
+                        document.getElementById('bot-info').textContent = 'Auto-trading active. ' + (s.total_trades || 0) + ' trades so far.';
+                    } else {
+                        document.getElementById('bot-info').textContent = 'Click Start to let the bot scan and trade automatically';
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load bot status:', e);
+            }
+        }
+
         async function startBot() {
             try {
                 const res = await apiFetch('/api/bot/start', { method: 'POST' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                document.getElementById('bot-status').textContent = 'Status: Running';
-                document.getElementById('start-btn').classList.add('hidden');
-                document.getElementById('stop-btn').classList.remove('hidden');
-                showNotification('Bot gestart!', 'success');
+                showNotification('Bot started!', 'success');
+                await loadBotStatus();
             } catch (e) {
                 console.error('Failed to start bot:', e);
-                showNotification('Kon bot niet starten.', 'error');
+                showNotification('Could not start bot.', 'error');
             }
         }
 
@@ -596,13 +651,178 @@
             try {
                 const res = await apiFetch('/api/bot/stop', { method: 'POST' });
                 if (!res.ok) throw new Error('HTTP ' + res.status);
-                document.getElementById('bot-status').textContent = 'Status: Stopped';
-                document.getElementById('start-btn').classList.remove('hidden');
-                document.getElementById('stop-btn').classList.add('hidden');
-                showNotification('Bot gestopt!', 'success');
+                showNotification('Bot stopped!', 'success');
+                await loadBotStatus();
             } catch (e) {
                 console.error('Failed to stop bot:', e);
-                showNotification('Kon bot niet stoppen.', 'error');
+                showNotification('Could not stop bot.', 'error');
+            }
+        }
+
+        async function loadOpportunities() {
+            try {
+                const res = await apiFetch('/api/trading/opportunities');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const list = document.getElementById('opportunities-list');
+                    if (data.data.length === 0) {
+                        list.innerHTML = '<div class="card rounded-xl p-6 text-center text-gray-400">No opportunities right now. The bot scans every 3 minutes.</div>';
+                        return;
+                    }
+                    list.innerHTML = data.data.map(opp => `
+                        <div class="card rounded-xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold text-xs">${opp.strategy ? opp.strategy.substring(0,3).toUpperCase() : 'BOT'}</div>
+                                <div>
+                                    <div class="font-semibold">${opp.token.symbol} <span class="text-xs text-gray-400">via ${opp.strategy || 'manual'}</span></div>
+                                    <div class="text-sm text-gray-400">${opp.token.name}</div>
+                                    <div class="text-xs text-gray-500 mt-1">${opp.token.price_change_24h >= 0 ? '+' : ''}${opp.token.price_change_24h.toFixed(1)}% 24h | Vol $${(opp.token.volume_24h/1000).toFixed(0)}K | Liq $${(opp.token.liquidity/1000).toFixed(0)}K</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold text-green-400">${(opp.confidence_score * 100).toFixed(0)}% confidence</div>
+                                <div class="text-sm text-gray-400">Expected +${opp.expected_profit.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('Failed to load opportunities:', e);
+            }
+        }
+
+        async function loadPositions() {
+            try {
+                const res = await apiFetch('/api/positions');
+                const data = await res.json();
+                if (data.success && data.data !== undefined) {
+                    const list = document.getElementById('positions-list');
+                    if (!data.data || data.data.length === 0) {
+                        list.innerHTML = '<div class="card rounded-xl p-6 text-center text-gray-400">No open positions. Start the bot to begin auto-trading.</div>';
+                        return;
+                    }
+                    list.innerHTML = data.data.map(p => {
+                        const tp = p.EntryPrice * (1 + p.TakeProfitPct / 100);
+                        const sl = p.EntryPrice * (1 - p.StopLossPct / 100);
+                        const pnlPct = ((p.Token.price - p.EntryPrice) / p.EntryPrice * 100).toFixed(1);
+                        const pnlPositive = p.Token.price >= p.EntryPrice;
+                        return `
+                        <div class="card rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">${p.Strategy ? p.Strategy.substring(0,3).toUpperCase() : 'POS'}</div>
+                                    <div>
+                                        <div class="font-semibold">${p.Token.symbol} <span class="text-xs text-gray-400">via ${p.Strategy || 'manual'}</span></div>
+                                        <div class="text-sm text-gray-400">${p.Amount} tokens @ $${p.EntryPrice.toExponential(2)}</div>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-semibold ${pnlPositive ? 'text-green-400' : 'text-red-400'}">${pnlPositive ? '+' : ''}${pnlPct}%</div>
+                                    <div class="text-xs text-gray-400">ML: ${(p.MLConfidence * 100).toFixed(0)}%</div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-xs">
+                                <div class="bg-white/5 rounded p-2"><span class="text-gray-400">Entry:</span> <span class="text-white">$${p.EntryPrice.toExponential(2)}</span></div>
+                                <div class="bg-white/5 rounded p-2"><span class="text-gray-400">Take Profit:</span> <span class="text-green-400">$${tp.toExponential(2)} (+${p.TakeProfitPct}%)</span></div>
+                                <div class="bg-white/5 rounded p-2"><span class="text-gray-400">Stop Loss:</span> <span class="text-red-400">$${sl.toExponential(2)} (-${p.StopLossPct}%)</span></div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Failed to load positions:', e);
+            }
+        }
+
+        async function loadStrategies() {
+            try {
+                const res = await apiFetch('/api/strategies');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const list = document.getElementById('strategies-list');
+                    const descs = {
+                        momentum: 'Detects coins with strong upward price movement (+15% or more in 24h) with high volume. Buys when the trend is breaking out.',
+                        dip_buy: 'Detects coins that dropped significantly (-15% or more) but still have healthy liquidity. Buys hoping the price will bounce back.',
+                        volume_spike: 'Detects coins with unusually high trading volume (3x normal) and rising price. Buys when activity spikes unexpectedly.'
+                    };
+                    list.innerHTML = data.data.strategies.map(s => `
+                        <div class="card rounded-xl p-4">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-8 h-8 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold text-xs">${s.substring(0,3).toUpperCase()}</div>
+                                <div class="font-semibold capitalize">${s.replace('_', ' ')}</div>
+                            </div>
+                            <p class="text-sm text-gray-400">${descs[s] || 'Custom strategy'}</p>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('Failed to load strategies:', e);
+            }
+        }
+
+        async function loadMLStatus() {
+            try {
+                const res = await apiFetch('/api/ml/status');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const ml = data.data;
+                    const info = document.getElementById('ml-info');
+                    const statusColor = ml.trained ? 'text-green-400' : 'text-yellow-400';
+                    const statusText = ml.trained ? 'Trained and active' : 'Warming up (needs ' + ml.min_samples + ' trades, has ' + ml.samples + ')';
+                    info.innerHTML = `
+                        <div class="card rounded-xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <div class="font-semibold text-lg">Model Status</div>
+                                    <div class="text-sm ${statusColor}">${statusText}</div>
+                                </div>
+                                <div class="text-3xl">${ml.trained ? '✅' : '⏳'}</div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-white/5 rounded-lg p-3">
+                                    <div class="text-gray-400 text-xs">Completed Trades (training data)</div>
+                                    <div class="text-xl font-bold">${ml.completed}</div>
+                                </div>
+                                <div class="bg-white/5 rounded-lg p-3">
+                                    <div class="text-gray-400 text-xs">Model Accuracy</div>
+                                    <div class="text-xl font-bold">${(ml.accuracy * 100).toFixed(0)}%</div>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-4">The ML model uses logistic regression to predict if a trade will be profitable. It needs at least ${ml.min_samples} completed trades to start making predictions. Until then, the bot uses rule-based confidence scores.</p>
+                        </div>`;
+                }
+            } catch (e) {
+                console.error('Failed to load ML status:', e);
+            }
+        }
+
+        async function loadDatasources() {
+            try {
+                const res = await apiFetch('/api/datasources/status');
+                const data = await res.json();
+                if (data.success && data.data) {
+                    const list = document.getElementById('datasources-list');
+                    list.innerHTML = data.data.map(ds => {
+                        const avail = ds.available;
+                        const dots = ds.total_calls > 0 ? ds.successful_calls + '/' + ds.total_calls : '0';
+                        return `
+                        <div class="card rounded-xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full ${avail ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'} flex items-center justify-center font-bold text-xs">${ds.name.substring(0,3).toUpperCase()}</div>
+                                <div>
+                                    <div class="font-semibold capitalize">${ds.name}</div>
+                                    <div class="text-sm text-gray-400">${avail ? 'Available' : 'In cooldown (rate limited)'}</div>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-semibold">${ds.successful_calls}/${ds.total_calls} calls</div>
+                                <div class="text-sm text-gray-400">${ds.failed_calls} failed</div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Failed to load datasources:', e);
             }
         }
 
@@ -612,13 +832,23 @@
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 const isActive = btn.dataset.tab === tab;
                 btn.className = isActive 
-                    ? 'tab-btn px-4 py-2 border-b-2 border-pink-500 font-semibold'
-                    : 'tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white';
+                    ? 'tab-btn px-4 py-2 border-b-2 border-pink-500 font-semibold whitespace-nowrap'
+                    : 'tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap';
             });
         }
 
-        // Auto-refresh
-        setInterval(() => { checkHealth(); loadPaperBalance(); loadMetrics(); loadTokens(); }, 30000);
+        // Auto-refresh every 15 seconds for live updates
+        setInterval(() => {
+            checkHealth();
+            loadPaperBalance();
+            loadMetrics();
+            loadTokens();
+            loadOpportunities();
+            loadPositions();
+            loadBotStatus();
+            loadMLStatus();
+            loadDatasources();
+        }, 15000);
     </script>
 </body>
 </html>
