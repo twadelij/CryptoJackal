@@ -1,17 +1,19 @@
 # CryptoJackal
 
-An autonomous cryptocurrency trading bot with multi-source data feeds, strategy engine, and ML-based trade evaluation. Built in Go with a React frontend.
+An autonomous cryptocurrency trading bot with multi-source data feeds, strategy engine, ML-based trade evaluation, and backtesting. Built in Go with a web dashboard.
 
 ## What It Does
 
 - **Multi-Source Token Discovery** - Fetches tokens from DexScreener, GeckoTerminal, and CoinGecko with automatic failover
 - **Rate Limiting & Caching** - Token bucket per source, 429 detection with exponential backoff, in-memory TTL cache
-- **Strategy Engine** - 3 strategies (momentum breakout, dip buy, volume spike) with confidence scoring
+- **Strategy Engine** - 6 strategies: momentum, dip buy, volume spike, RSI oversold, MACD crossover, Bollinger bounce
+- **Technical Indicators** - RSI, MACD, SMA, EMA, Bollinger Bands in pure Go
+- **Backtesting** - Test strategies against historical Binance/Kraken data with equity curve, max drawdown, Sharpe ratio
 - **Position Monitor** - Take profit / stop loss / trailing stop on open positions
 - **Trade Journal & ML** - Records trade features and outcomes, trains logistic regression model to predict win probability
 - **Paper Trading** - Practice trading with fake money (recommended for beginners)
 - **Live Trading** - Execute real trades on Ethereum (requires setup)
-- **Web Dashboard** - Control everything from your browser
+- **Web Dashboard** - Control everything from your browser with live charts
 
 ## Quick Start
 
@@ -125,6 +127,9 @@ Open `http://localhost:8080`.
 | `/api/strategies` | GET | List registered strategies |
 | `/api/ml/status` | GET | ML model status (trained, samples, accuracy) |
 | `/api/datasources/status` | GET | Status of all data providers |
+| `/api/backtest/run` | POST | Run backtest with historical data (Binance/Kraken) |
+| `/api/backtest/history` | GET | List previous backtest results |
+| `/api/indicators/:pair` | GET | Get technical indicators for a trading pair |
 
 ## Architecture
 
