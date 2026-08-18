@@ -111,6 +111,11 @@ func NewServer(cfg *config.Config, engine *trading.Engine, disc *discovery.Servi
 
 			// Datasource status
 			protected.GET("/datasources/status", handler.GetDatasourceStatus)
+
+			// Backtesting
+			protected.POST("/backtest/run", handler.RunBacktest)
+			protected.GET("/backtest/history", handler.GetBacktestHistory)
+			protected.GET("/indicators/:pair", handler.GetIndicators)
 		}
 	}
 

@@ -4,17 +4,18 @@ import (
 	"context"
 	"sync"
 
+	"github.com/twadelij/cryptojackal/internal/indicators"
 	"github.com/twadelij/cryptojackal/internal/models"
 	"go.uber.org/zap"
 )
 
 // Signal represents a trading signal from a strategy
 type Signal struct {
-	Token       models.Token
-	Action      string  // "buy", "sell", "hold"
-	Confidence  float64 // 0.0-1.0
-	Strategy    string  // strategy name
-	Reason      string  // human-readable explanation
+	Token      models.Token
+	Action     string  // "buy", "sell", "hold"
+	Confidence float64 // 0.0-1.0
+	Strategy   string  // strategy name
+	Reason     string  // human-readable explanation
 }
 
 // Strategy interface for all trading strategies
@@ -22,6 +23,12 @@ type Strategy interface {
 	Analyze(ctx context.Context, token models.Token) Signal
 	Name() string
 	Enabled() bool
+}
+
+// CandleStrategy extends Strategy with candle-based analysis for backtesting
+type CandleStrategy interface {
+	Strategy
+	AnalyzeCandles(ctx context.Context, candles indicators.CandleSeries) Signal
 }
 
 // Engine runs multiple strategies and combines their signals

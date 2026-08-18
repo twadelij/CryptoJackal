@@ -6,6 +6,7 @@
     <title>CryptoJackal - Trading Bot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         .gradient-bg { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); }
         .card { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
@@ -199,6 +200,7 @@
                 <button onclick="showTab('strategies')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="strategies">Strategies</button>
                 <button onclick="showTab('ml')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="ml">ML Model</button>
                 <button onclick="showTab('datasources')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="datasources">Data Sources</button>
+                <button onclick="showTab('backtest')" class="tab-btn px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-white whitespace-nowrap" data-tab="backtest">Backtest</button>
             </div>
 
             <!-- Tab Content -->
@@ -269,6 +271,116 @@
             <div id="tab-datasources" class="tab-content hidden">
                 <p class="text-gray-400 text-sm mb-4">External API data sources with automatic failover if one goes down.</p>
                 <div id="datasources-list" class="space-y-3"></div>
+            </div>
+
+            <div id="tab-backtest" class="tab-content hidden">
+                <p class="text-gray-400 text-sm mb-4">Test trading strategies against historical market data before risking real funds.</p>
+                <div class="card rounded-xl p-6 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Trading Pair</label>
+                            <input type="text" id="bt-pair" value="BTCUSDT" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Exchange</label>
+                            <select id="bt-exchange" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                                <option value="binance">Binance</option>
+                                <option value="kraken">Kraken</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Interval</label>
+                            <select id="bt-interval" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                                <option value="1h">1 hour</option>
+                                <option value="4h">4 hours</option>
+                                <option value="1d">1 day</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Candles</label>
+                            <input type="number" id="bt-limit" value="500" min="50" max="1000" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Initial Balance ($)</label>
+                            <input type="number" id="bt-balance" value="10000" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Trade Amount ($)</label>
+                            <input type="number" id="bt-amount" value="100" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Fee (%)</label>
+                            <input type="number" id="bt-fee" value="0.1" step="0.01" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Take Profit (%)</label>
+                            <input type="number" id="bt-tp" value="15" step="0.5" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Stop Loss (%)</label>
+                            <input type="number" id="bt-sl" value="10" step="0.5" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Max Positions</label>
+                            <input type="number" id="bt-maxpos" value="3" min="1" max="10" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 focus:border-pink-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm text-gray-400 mb-2">Strategies</label>
+                        <div class="flex gap-4 flex-wrap">
+                            <label class="flex items-center gap-2"><input type="checkbox" id="bt-strat-rsi" checked class="rounded"> RSI Oversold</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="bt-strat-macd" checked class="rounded"> MACD Crossover</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" id="bt-strat-bb" checked class="rounded"> Bollinger Bounce</label>
+                        </div>
+                    </div>
+                    <button onclick="runBacktest()" id="bt-run-btn" class="btn-primary px-6 py-2 rounded-lg font-semibold">Run Backtest</button>
+                </div>
+                <div id="backtest-results" class="hidden">
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                        <div class="card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs">Total Trades</div>
+                            <div id="bt-r-trades" class="text-xl font-bold">0</div>
+                        </div>
+                        <div class="card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs">Win Rate</div>
+                            <div id="bt-r-winrate" class="text-xl font-bold">0%</div>
+                        </div>
+                        <div class="card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs">Total P&L</div>
+                            <div id="bt-r-pnl" class="text-xl font-bold">$0</div>
+                        </div>
+                        <div class="card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs">Max Drawdown</div>
+                            <div id="bt-r-dd" class="text-xl font-bold">0%</div>
+                        </div>
+                        <div class="card rounded-xl p-4">
+                            <div class="text-gray-400 text-xs">Sharpe Ratio</div>
+                            <div id="bt-r-sharpe" class="text-xl font-bold">0</div>
+                        </div>
+                    </div>
+                    <div class="card rounded-xl p-4 mb-4">
+                        <canvas id="bt-equity-chart" height="200"></canvas>
+                    </div>
+                    <div class="card rounded-xl overflow-hidden">
+                        <table class="w-full text-sm">
+                            <thead class="bg-white/5">
+                                <tr>
+                                    <th class="text-left p-3 text-gray-400">#</th>
+                                    <th class="text-left p-3 text-gray-400">Strategy</th>
+                                    <th class="text-right p-3 text-gray-400">Entry</th>
+                                    <th class="text-right p-3 text-gray-400">Exit</th>
+                                    <th class="text-right p-3 text-gray-400">P&L</th>
+                                    <th class="text-left p-3 text-gray-400">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bt-trades-body"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -849,6 +961,105 @@
             loadMLStatus();
             loadDatasources();
         }, 15000);
+
+        let btEquityChart = null;
+
+        async function runBacktest() {
+            const btn = document.getElementById('bt-run-btn');
+            btn.textContent = 'Running...';
+            btn.disabled = true;
+
+            const strategies = [];
+            if (document.getElementById('bt-strat-rsi').checked) strategies.push('rsi_oversold');
+            if (document.getElementById('bt-strat-macd').checked) strategies.push('macd_crossover');
+            if (document.getElementById('bt-strat-bb').checked) strategies.push('bollinger_bounce');
+
+            const body = {
+                pair: document.getElementById('bt-pair').value,
+                exchange: document.getElementById('bt-exchange').value,
+                interval: document.getElementById('bt-interval').value,
+                limit: parseInt(document.getElementById('bt-limit').value),
+                initial_balance: parseFloat(document.getElementById('bt-balance').value),
+                trade_amount: parseFloat(document.getElementById('bt-amount').value),
+                take_profit_pct: parseFloat(document.getElementById('bt-tp').value),
+                stop_loss_pct: parseFloat(document.getElementById('bt-sl').value),
+                max_open_positions: parseInt(document.getElementById('bt-maxpos').value),
+                fee_pct: parseFloat(document.getElementById('bt-fee').value),
+                strategies: strategies
+            };
+
+            try {
+                const res = await apiFetch('/api/backtest/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.success && data.data) {
+                    displayBacktestResults(data.data);
+                } else {
+                    showNotification(data.error || 'Backtest failed', 'error');
+                }
+            } catch (e) {
+                showNotification('Backtest request failed: ' + e.message, 'error');
+            } finally {
+                btn.textContent = 'Run Backtest';
+                btn.disabled = false;
+            }
+        }
+
+        function displayBacktestResults(r) {
+            document.getElementById('backtest-results').classList.remove('hidden');
+            document.getElementById('bt-r-trades').textContent = r.total_trades;
+            document.getElementById('bt-r-winrate').textContent = r.win_rate.toFixed(1) + '%';
+            const pnlEl = document.getElementById('bt-r-pnl');
+            pnlEl.textContent = (r.total_profit_loss >= 0 ? '+$' : '-$') + Math.abs(r.total_profit_loss).toFixed(2);
+            pnlEl.className = 'text-xl font-bold ' + (r.total_profit_loss >= 0 ? 'text-green-400' : 'text-red-400');
+            document.getElementById('bt-r-dd').textContent = r.max_drawdown.toFixed(1) + '%';
+            document.getElementById('bt-r-sharpe').textContent = r.sharpe_ratio.toFixed(2);
+
+            const tbody = document.getElementById('bt-trades-body');
+            if (r.trades && r.trades.length > 0) {
+                tbody.innerHTML = r.trades.map((t, i) => `
+                    <tr class="border-t border-white/5">
+                        <td class="p-3">${i + 1}</td>
+                        <td class="p-3">${t.strategy}</td>
+                        <td class="p-3 text-right">$${t.entry_price.toFixed(4)}</td>
+                        <td class="p-3 text-right">$${t.exit_price.toFixed(4)}</td>
+                        <td class="p-3 text-right ${t.profit_loss >= 0 ? 'text-green-400' : 'text-red-400'}">${t.profit_loss >= 0 ? '+' : ''}$${t.profit_loss.toFixed(2)}</td>
+                        <td class="p-3 text-xs">${t.exit_reason}</td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-gray-400">No trades were made. Try different strategies or parameters.</td></tr>';
+            }
+
+            if (btEquityChart) btEquityChart.destroy();
+            const ctx = document.getElementById('bt-equity-chart').getContext('2d');
+            btEquityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: r.equity_curve.map((_, i) => i),
+                    datasets: [{
+                        label: 'Equity',
+                        data: r.equity_curve,
+                        borderColor: '#e94560',
+                        backgroundColor: 'rgba(233, 69, 96, 0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>

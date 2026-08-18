@@ -7,11 +7,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/twadelij/cryptojackal/internal/backtest"
 	"github.com/twadelij/cryptojackal/internal/config"
 	"github.com/twadelij/cryptojackal/internal/discovery"
+	"github.com/twadelij/cryptojackal/internal/indicators"
 	"github.com/twadelij/cryptojackal/internal/models"
 	"github.com/twadelij/cryptojackal/internal/paper"
 	"github.com/twadelij/cryptojackal/internal/storage"
+	"github.com/twadelij/cryptojackal/internal/strategy"
 	"github.com/twadelij/cryptojackal/internal/trading"
 	"go.uber.org/zap"
 )
@@ -462,6 +465,208 @@ func (h *Handler) Login(c *gin.Context) {
 		Data: gin.H{
 			"token": tokenString,
 			"type":  "Bearer",
+		},
+	})
+}
+
+// BacktestRequest is the request body for running a backtest
+type BacktestRequest struct {
+	Pair             string   `json:"pair"`
+	Exchange         string   `json:"exchange"`
+	Interval         string   `json:"interval"`
+	Limit            int      `json:"limit"`
+	InitialBalance   float64  `json:"initial_balance"`
+	TradeAmount      float64  `json:"trade_amount"`
+	TakeProfitPct    float64  `json:"take_profit_pct"`
+	StopLossPct      float64  `json:"stop_loss_pct"`
+	MaxOpenPositions int      `json:"max_open_positions"`
+	FeePct           float64  `json:"fee_pct"`
+	Strategies       []string `json:"strategies"`
+}
+
+// RunBacktest downloads candle data and runs a backtest
+func (h *Handler) RunBacktest(c *gin.Context) {
+	var req BacktestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+		return
+	}
+
+	if req.Pair == "" {
+		req.Pair = "BTCUSDT"
+	}
+	if req.Exchange == "" {
+		req.Exchange = "binance"
+	}
+	if req.Interval == "" {
+		req.Interval = "1h"
+	}
+	if req.Limit <= 0 || req.Limit > 1000 {
+		req.Limit = 500
+	}
+	if req.InitialBalance <= 0 {
+		req.InitialBalance = 10000
+	}
+	if req.TradeAmount <= 0 {
+		req.TradeAmount = 100
+	}
+	if req.TakeProfitPct <= 0 {
+		req.TakeProfitPct = 15
+	}
+	if req.StopLossPct <= 0 {
+		req.StopLossPct = 10
+	}
+	if req.MaxOpenPositions <= 0 {
+		req.MaxOpenPositions = 3
+	}
+	if req.FeePct <= 0 {
+		req.FeePct = 0.1
+	}
+
+	downloader := backtest.NewDataDownloader()
+
+	var candles indicators.CandleSeries
+	var err error
+
+	switch req.Exchange {
+	case "binance":
+		candles, err = downloader.DownloadFromBinance(req.Pair, req.Interval, req.Limit)
+	case "kraken":
+		var intervalInt int
+		switch req.Interval {
+		case "1h":
+			intervalInt = 60
+		case "4h":
+			intervalInt = 240
+		case "1d":
+			intervalInt = 1440
+		default:
+			intervalInt = 60
+		}
+		candles, err = downloader.DownloadFromKraken(req.Pair, intervalInt)
+	default:
+		candles, err = downloader.DownloadFromBinance(req.Pair, req.Interval, req.Limit)
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: "failed to download candle data: " + err.Error()})
+		return
+	}
+
+	if candles.Len() < 30 {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "insufficient candle data for backtesting (need at least 30 candles)"})
+		return
+	}
+
+	cfg := backtest.Config{
+		InitialBalance:   req.InitialBalance,
+		TradeAmount:      req.TradeAmount,
+		TakeProfitPct:    req.TakeProfitPct,
+		StopLossPct:      req.StopLossPct,
+		MaxOpenPositions: req.MaxOpenPositions,
+		FeePct:           req.FeePct,
+	}
+
+	allStrategies := []strategy.Strategy{
+		strategy.NewRSIOversoldStrategy(),
+		strategy.NewMACDCrossoverStrategy(),
+		strategy.NewBollingerBounceStrategy(),
+	}
+
+	var selectedStrategies []strategy.Strategy
+	if len(req.Strategies) == 0 {
+		selectedStrategies = allStrategies
+	} else {
+		for _, name := range req.Strategies {
+			for _, s := range allStrategies {
+				if s.Name() == name {
+					selectedStrategies = append(selectedStrategies, s)
+					break
+				}
+			}
+		}
+	}
+
+	if len(selectedStrategies) == 0 {
+		selectedStrategies = allStrategies
+	}
+
+	btEngine := backtest.NewEngine(h.logger)
+	candlesMap := map[string]indicators.CandleSeries{req.Pair: candles}
+	result := btEngine.Run(c.Request.Context(), cfg, candlesMap, selectedStrategies)
+
+	c.JSON(http.StatusOK, Response{Success: true, Data: result})
+}
+
+// GetBacktestHistory returns a list of previous backtest results (placeholder)
+func (h *Handler) GetBacktestHistory(c *gin.Context) {
+	c.JSON(http.StatusOK, Response{Success: true, Data: []interface{}{}})
+}
+
+// GetIndicators returns technical indicator values for a given token
+func (h *Handler) GetIndicators(c *gin.Context) {
+	pair := c.Param("pair")
+	if pair == "" {
+		pair = "BTCUSDT"
+	}
+
+	exchange := c.DefaultQuery("exchange", "binance")
+	interval := c.DefaultQuery("interval", "1h")
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+	if limit <= 0 || limit > 1000 {
+		limit = 100
+	}
+
+	downloader := backtest.NewDataDownloader()
+
+	var candles indicators.CandleSeries
+	var err error
+
+	switch exchange {
+	case "binance":
+		candles, err = downloader.DownloadFromBinance(pair, interval, limit)
+	case "kraken":
+		candles, err = downloader.DownloadFromKraken(pair, 60)
+	default:
+		candles, err = downloader.DownloadFromBinance(pair, interval, limit)
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Success: false, Error: "failed to download data: " + err.Error()})
+		return
+	}
+
+	if candles.Len() < 30 {
+		c.JSON(http.StatusBadRequest, Response{Success: false, Error: "insufficient data for indicators"})
+		return
+	}
+
+	rsi := indicators.RSI(candles, 14)
+	macd := indicators.MACD(candles, 12, 26, 9)
+	sma20 := indicators.SMA(candles, 20)
+	ema12 := indicators.EMA(candles, 12)
+	upper, middle, lower := indicators.BollingerBands(candles, 20, 2.0)
+
+	n := candles.Len()
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: gin.H{
+			"pair":     pair,
+			"interval": interval,
+			"candles":  candles.Len(),
+			"indicators": gin.H{
+				"rsi":         rsi[n-1],
+				"macd_line":   macd.MACDLine[n-1],
+				"macd_signal": macd.SignalLine[n-1],
+				"macd_hist":   macd.Histogram[n-1],
+				"sma_20":      sma20[n-1],
+				"ema_12":      ema12[n-1],
+				"bb_upper":    upper[n-1],
+				"bb_middle":   middle[n-1],
+				"bb_lower":    lower[n-1],
+			},
+			"last_price": candles.Last().Close,
 		},
 	})
 }
